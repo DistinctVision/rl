@@ -9,3 +9,6 @@ argparse
 einops
 rlgym_compat
 pandas
+shimmy
+stable_baselines3
+rlgym_tools
