@@ -1,0 +1,11 @@
+pygame
+PyYaml
+rlbot
+tqdm
+# wandb
+plotly
+kaleido
+argparse
+einops
+rlgym_compat
+pandas

@@ -1,0 +1,45 @@
+model:
+  in_size: 63
+  out_size: 90
+
+  layers: [512, 128]
+  dropout: 0.0
+  reward_decay: 0.99
+
+  _critic_model_path: '../gym_output/dqn_10_20_2023__20_01_06/weights/lunar_lander_560.kpt'
+  _critic_optimizer_path: '../gym_output/dqn_10_20_2023__01_24_57/weights/opt_critic_model_1800.kpt'
+
+replay_buffer:
+  max_buffer_size: 50000
+  _data_dir: ../gym_output/dqn_10_19_2023__15_29_00/weights
+
+
+training:
+  lr: 1e-3
+  
+  batch_size: 512
+  train_size: 0.9
+  val_size: 0.1
+  n_grad_accum_steps: 1
+  grad_norm: 1.0
+  fp16: False
+
+  n_local_steps: 1000
+  model_update:
+    n_steps: 4
+    type: soft
+    rate: 1e-4
+
+  output_folder: ../dqn_output
+  
+  save:
+    model_name: daft_quick_nick
+    save_every_n_step: 30
+    n_last_steps: 10
+    target_metric: reward
+    target_op: '>'
+    
+  eps_greedy:
+    eps_from: 0.9
+    eps_to: 0.1
+    n_epochs_of_decays: 3000000
