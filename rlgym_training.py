@@ -18,6 +18,7 @@ from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 from daft_quick_nick.game_data import ModelDataProvider
 from daft_quick_nick.training import Trainer, ReplayBuffer, EpisodeDataRecorder
 from daft_quick_nick.training import GymActionParser, GymObsBuilder, Trainer, RewardEstimator
+from daft_quick_nick.training import RandomBallGameState
 
 
 def fix_data(data) -> tp.List[torch.Tensor]:
@@ -63,7 +64,7 @@ def rlgym_training(num_instances: int):
             reward_function=reward_estimator,
             terminal_conditions=[TimeoutCondition(30 * 10), GoalScoredCondition()],
             obs_builder=obs_builder,
-            state_setter=DefaultState(),
+            state_setter=RandomBallGameState(),
             action_parser=action_parser,
             game_speed=100, tick_skip=12, spawn_opponents=True, team_size=1
         )
@@ -74,6 +75,9 @@ def rlgym_training(num_instances: int):
     last_rewards = deque(maxlen=100)
     ep_counter = 0
     default_action_index = model_data_provider.default_action_index
+    
+    train_freq = int(cfg['training']['train_freq'])
+    data_counter = 0
     
     while True:
         obs = env.reset()
@@ -89,7 +93,10 @@ def rlgym_training(num_instances: int):
             env.step_async(actions)
             
             if len(replay_buffer) > min_rp_data_size:
-                trainer.train_step()
+                data_counter += num_instances * num_cars
+                if data_counter >= train_freq:
+                    trainer.train_step()
+                    data_counter = data_counter % train_freq
             
             next_obs, rewards, next_done, gameinfo = env.step_wait()
             next_obs = fix_data(next_obs)
@@ -102,7 +109,7 @@ def rlgym_training(num_instances: int):
             
             ep_rewards += rewards
             obs = next_obs
-            done = next_done
+            done = np.logical_or(done, next_done)
             steps += 1
         
         for reward in ep_rewards:

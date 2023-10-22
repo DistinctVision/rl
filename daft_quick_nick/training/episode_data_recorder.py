@@ -21,7 +21,7 @@ class EpisodeDataRecorder:
                world_state_tensor: torch.Tensor,
                action: int, reward: float,
                episode_is_done: bool) -> bool:
-        self.current_episode.add(world_state_tensor, action, reward)
+        self.current_episode.add(world_state_tensor.clone(), action, reward)
         
         data_is_updated = False
         if episode_is_done:

@@ -8,3 +8,4 @@ from .episode_data_recorder import EpisodeDataRecorder
 from .log_writer import LogWriter, BatchValueList, get_run_name, make_output_folder
 from .rp_data_types import RP_Record, RP_RecordArray, RP_SeqOfRecords
 from .replay_buffer import ReplayBuffer
+from  .random_ball_game_state import RandomBallGameState

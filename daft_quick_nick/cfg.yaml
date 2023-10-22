@@ -13,6 +13,7 @@ replay_buffer:
 
 
 training:
+  train_freq: 64
   lr: 1e-3
   
   batch_size: 512
@@ -22,13 +23,13 @@ training:
   grad_norm: 1.0
   fp16: False
 
-  n_local_steps: 1000
+  n_local_steps: 100
   model_update:
-    n_steps: 4
+    n_steps: 10
     type: soft
-    rate: 1e-4
+    rate: 1e-2
 
-  output_folder: ../dqn_output
+  output_folder: ../rl_output
   
   save:
     model_name: daft_quick_nick
@@ -40,4 +41,4 @@ training:
   eps_greedy:
     eps_from: 0.9
     eps_to: 0.1
-    n_epochs_of_decays: 3000000
+    n_epochs_of_decays: 30000
