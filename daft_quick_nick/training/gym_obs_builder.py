@@ -7,17 +7,19 @@ import torch
 from rlgym.utils.obs_builders import ObsBuilder
 from rlgym.utils.gamestates import PlayerData, GameState
 
-from game_data import WorldState, BallInfo, EulerAngles, Vec3, PlayerInfo, ModelDataProvider
+from daft_quick_nick.game_data import WorldState, BallInfo, EulerAngles, Vec3, PlayerInfo, ModelDataProvider
 
 
 class GymObsBuilder(ObsBuilder):
 
-    def __init__(self):
-        self.data_provider = ModelDataProvider()
+    def __init__(self, data_provider: ModelDataProvider):
+        self.data_provider = data_provider
         self.inverted = False
 
     def get_obs_space(self) -> gym.spaces.Space:
-        return gym.spaces.Space(shape=(self.data_provider.WORLD_STATE_SIZE,), dtype=np.float32)
+        return gym.spaces.Box(low=-np.inf, high=np.inf,
+                              shape=(self.data_provider.WORLD_STATE_SIZE,),
+                              dtype=np.float32)
 
     def reset(self, initial_state: GameState):
         self.inverted = np.random.choice([True, False])

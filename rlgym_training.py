@@ -4,6 +4,7 @@ import yaml
 from collections import deque
 
 import numpy as np
+import torch
 
 from rlgym.envs import Match
 from rlgym.utils.reward_functions import DefaultReward
@@ -19,18 +20,43 @@ from daft_quick_nick.training import Trainer, ReplayBuffer, EpisodeDataRecorder
 from daft_quick_nick.training import GymActionParser, GymObsBuilder, Trainer, RewardEstimator
 
 
+def fix_data(data) -> tp.List[torch.Tensor]:
+    """
+    This is a workaround to fix the bug inside sb3. Just reformat output data.
+    """
+    
+    
+    if isinstance(data, torch.Tensor):
+        return [data]
+    out  = []
+    for d in data:
+        if len(d) == 0:
+            continue
+        if isinstance(d, torch.Tensor):
+            out.append(d)
+            continue
+        assert isinstance(d,  list)
+        for e in d:
+            assert isinstance(e,  torch.Tensor)
+            out.append(e)
+    return out
+
+
 def rlgym_training(num_instances: int):
     cfg = yaml.safe_load(open(Path('daft_quick_nick') / 'cfg.yaml', 'r'))
     replay_buffer_cfg = dict(cfg['replay_buffer'])
     min_rp_data_size = int(replay_buffer_cfg['min_buffer_size'])
-
-    action_parser = GymActionParser()
-    obs_builder = GymObsBuilder()
+    
+    model_data_provider = ModelDataProvider()
+    action_parser = GymActionParser(model_data_provider)
+    obs_builder = GymObsBuilder(model_data_provider)
     reward_estimator = RewardEstimator(float(cfg['model']['reward_decay']))
     replay_buffer = ReplayBuffer()
     trainer = Trainer(cfg, replay_buffer)
+        
+    num_cars = 2
     
-    ep_data_recorders = [EpisodeDataRecorder(trainer) for _ in range(num_instances)]
+    ep_data_recorders = [EpisodeDataRecorder(trainer) for _ in range(num_cars * num_instances)]
 
     def get_match():
         return Match(
@@ -47,28 +73,32 @@ def rlgym_training(num_instances: int):
 
     last_rewards = deque(maxlen=100)
     ep_counter = 0
-
+    default_action_index = model_data_provider.default_action_index
+    
     while True:
         obs = env.reset()
-        done = np.array([False for _ in range(num_instances)], dtype=bool)
+        obs = fix_data(obs)
+        done = np.array([False for _ in  range(num_cars * num_instances)], dtype=bool)
         
         steps = 0
-        ep_rewards = np.zeros((num_instances,), dtype=float)
+        ep_rewards = np.zeros((num_instances * num_cars), dtype=float)
         
         while not done.all():
-            actions = [ep_data_recorders[env_idx].get_action(obs[env_idx]) if not done[env_idx] else None
-                       for env_idx in range(num_instances)]
+            actions = [ep_data_recorder.get_action(car_obs) if not car_done else default_action_index
+                       for ep_data_recorder, car_obs, car_done in zip(ep_data_recorders, obs, done)]
             env.step_async(actions)
             
             if len(replay_buffer) > min_rp_data_size:
                 trainer.train_step()
             
             next_obs, rewards, next_done, gameinfo = env.step_wait()
+            next_obs = fix_data(next_obs)
 
-            for env_idx in range(num_instances):
-                if done[env_idx]:
+            for car_idx in range(num_instances * num_cars):
+                if done[car_idx]:
                     continue
-                ep_data_recorders[env_idx].record(obs[env_idx], actions[env_idx], rewards[env_idx], next_done[env_idx])
+                ep_data_recorders[car_idx].record(obs[car_idx], actions[car_idx], 
+                                                  rewards[car_idx], next_done[car_idx])
             
             ep_rewards += rewards
             obs = next_obs
@@ -81,9 +111,11 @@ def rlgym_training(num_instances: int):
         trainer.add_metric_value('reward', last_mean_reward)
         
         ep_counter += 1
+        
+        rewards_str = ', '.join([f"{float(reward):.2f}" for reward in ep_rewards])
 
         print(f'Episode: {ep_counter} | Replay buffer size: {len(replay_buffer)} | Mean rewards: {last_mean_reward:.2f} '\
-              f'| Episode Rewards: {", ".join([f"{reward:.2f}" for reward in last_rewards])}')
+              f'| Episode Rewards: {rewards_str}')
     
     
 if __name__ == '__main__':

@@ -16,9 +16,9 @@ class GymActionParser(ActionParser):
         self.data_provider = data_provider
 
     def get_action_space(self) -> gym.spaces.Space:
-        return gym.spaces.Box(-1, 1, shape=(common_values.NUM_ACTIONS,))
+        return gym.spaces.Discrete(n=self.data_provider.num_actions)
 
-    def parse_actions(self, actions: tp.List[int], state: GameState) -> np.ndarray:
+    def parse_actions(self, actions: tp.List[tp.List[int]], state: GameState) -> np.ndarray:
         action_arr = []
         for action_idx in actions:
             action = self.data_provider.action_lookup_table[action_idx]

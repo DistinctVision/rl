@@ -56,6 +56,10 @@ class ModelDataProvider:
     def __init__(self):
         self.action_lookup_table, self.action_states = self._make_action_lookup_table()
         self.data_scaler = DataScaler()
+        
+    @property
+    def default_action_index(self) -> int:
+        return 8
     
     def world_state_to_tensor(self, world_state: WorldState, agent_team_idx: int,
                               device: tp.Union[torch.device, str] = 'cpu',
