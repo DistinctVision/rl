@@ -3,14 +3,16 @@ model:
   dropout: 0.0
   reward_decay: 0.99
 
-  _critic_model_path: '../gym_output/dqn_10_20_2023__20_01_06/weights/lunar_lander_560.kpt'
-  _critic_optimizer_path: '../gym_output/dqn_10_20_2023__01_24_57/weights/opt_critic_model_1800.kpt'
+  critic_model_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/best_daft_quick_nick.kpt'
+  _critic_optimizer_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/opt_daft_quick_nick_640.kpt'
 
 replay_buffer:
   max_buffer_size: 500000
   min_buffer_size: 1000
   _data_dir: ../gym_output/dqn_10_19_2023__15_29_00/weights
 
+game:
+  fps: 10
 
 training:
   train_freq: 64

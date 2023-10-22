@@ -182,6 +182,9 @@ class ModelDataProvider:
                                                          pitch=0, yaw=steer, roll=0,
                                                          jump=False, boost=boost > 0, handbrake=handbrake > 0,
                                                          use_item=False))
+                        
+        print(f'Ground: {len(action_states)}')
+        
         # Aerial
         for pitch in (-1, 0, 1):
             for yaw in (-1, 0, 1):

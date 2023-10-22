@@ -26,7 +26,6 @@ def fix_data(data) -> tp.List[torch.Tensor]:
     This is a workaround to fix the bug inside sb3. Just reformat output data.
     """
     
-    
     if isinstance(data, torch.Tensor):
         return [data]
     out  = []
