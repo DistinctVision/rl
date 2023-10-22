@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 import torch
 
-from daft_quick_nick.game_data.rp_data_types import RP_Record, RP_RecordArray, RP_SeqOfRecords
+from daft_quick_nick.training.rp_data_types import RP_Record, RP_RecordArray, RP_SeqOfRecords
 
 
 class ReplayBuffer:
@@ -108,11 +108,11 @@ class ReplayBuffer:
             mask_done.append(False)
         
         next_batch = RP_RecordArray(world_states=torch.stack([record.world_state_tensor
-                                                           for record in next_records]),
-                                 action_indices=torch.tensor([record.action_index
-                                                              for record in next_records],
-                                                             dtype=torch.int16),
-                                 rewards=torch.tensor([record.reward for record in next_records],
-                                                       dtype=torch.float32))
+                                                              for record in next_records]),
+                                    action_indices=torch.tensor([record.action_index
+                                                                 for record in next_records],
+                                                                dtype=torch.int16),
+                                    rewards=torch.tensor([record.reward for record in next_records],
+                                                         dtype=torch.float32))
         mask_done = torch.tensor(mask_done, dtype=torch.bool)
         return cur_batch, next_batch, mask_done

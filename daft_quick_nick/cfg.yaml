@@ -1,8 +1,5 @@
 model:
-  in_size: 63
-  out_size: 90
-
-  layers: [512, 128]
+  layers: [512, 256]
   dropout: 0.0
   reward_decay: 0.99
 
@@ -10,7 +7,8 @@ model:
   _critic_optimizer_path: '../gym_output/dqn_10_20_2023__01_24_57/weights/opt_critic_model_1800.kpt'
 
 replay_buffer:
-  max_buffer_size: 50000
+  max_buffer_size: 500000
+  min_buffer_size: 1000
   _data_dir: ../gym_output/dqn_10_19_2023__15_29_00/weights
 
 
@@ -34,8 +32,8 @@ training:
   
   save:
     model_name: daft_quick_nick
-    save_every_n_step: 30
-    n_last_steps: 10
+    save_every_n_step: 10
+    n_last_steps: 100
     target_metric: reward
     target_op: '>'
     

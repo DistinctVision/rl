@@ -3,17 +3,16 @@ import typing as tp
 from pathlib import Path
 import logging
 import yaml
-import math
 from tqdm import tqdm
 from contextlib import nullcontext
 from dataclasses  import dataclass
 
-import numpy as np
 import torch
 from tqdm import tqdm
 
-from util import LogWriter, get_run_name, make_output_folder, BatchValueList
-from daft_quick_nick.game_data import ReplayBuffer,  RP_SeqOfRecords
+from daft_quick_nick.training.log_writer import LogWriter, get_run_name, make_output_folder, BatchValueList
+from daft_quick_nick.training.replay_buffer import ReplayBuffer
+from daft_quick_nick.game_data import ModelDataProvider
 from daft_quick_nick.model import CriticModel, get_model_num_params
 
 
@@ -34,7 +33,10 @@ class Trainer:
         self.logger = logging.getLogger(__name__)
         self.device = torch.device('cuda:0')
 
-        self.action_set = [action_idx for action_idx in range(int(self.cfg['model']['out_size']))]
+        self.data_provider = ModelDataProvider()
+
+        # self.action_set = [action_idx for action_idx in range(int(self.cfg['model']['out_size']))]
+        self.action_set = [0, 2, 4, 6, 8, 10, 12, 16, 20]
         self.replay_buffer = replay_buffer
         self.model: tp.Optional[CriticModel] = None
         self.target_model: tp.Optional[CriticModel] = None
@@ -62,8 +64,8 @@ class Trainer:
         model_cfg = dict(self.cfg['model'])
         training_cfg = dict(self.cfg['training'])
         
-        self.model = CriticModel.build_model(model_cfg)
-        self.target_model = CriticModel.build_model(model_cfg)
+        self.model = CriticModel.build_model(self.data_provider, model_cfg)
+        self.target_model = CriticModel.build_model(self.data_provider, model_cfg)
         if 'critic_model_path' in model_cfg:
             ckpt = torch.load(str(model_cfg['critic_model_path']), map_location='cpu')
             self.target_model.load_state_dict(ckpt)
@@ -233,48 +235,3 @@ class Trainer:
                 self._hard_model_update()
             else:
                 raise RuntimeError(f'Unknown model update type: {model_update_type}')
-        
-
-class EpisodeDataRecorder:
-    
-    def __init__(self, trainer: Trainer):
-        self.trainer = trainer
-        self.current_episode = RP_SeqOfRecords()
-    
-    def __len__(self) -> int:
-        return len(self.current_episode)
-    
-    def get_action(self, world_state_tensor: torch.Tensor) -> int:
-        return self._get_action_idx(world_state_tensor)
-    
-    def record(self,
-               world_state_tensor: torch.Tensor,
-               action: int, reward: float,
-               episode_is_done: bool) -> bool:
-        self.current_episode.add(world_state_tensor, action, reward)
-        
-        data_is_updated = False
-        if episode_is_done:
-            data_is_updated = self.trainer.replay_buffer.add_episode(self.current_episode)
-            self.current_episode = RP_SeqOfRecords()
-            max_buffer_size = int(self.trainer.cfg['replay_buffer']['max_buffer_size'])
-            while len(self.trainer.replay_buffer) > max_buffer_size:
-                self.trainer.replay_buffer.remove_first_episode()
-                
-        return data_is_updated
-    
-    def _get_action_idx(self, world_state_tensor: torch.Tensor) -> int:
-        eps_greedy_coeff = self.trainer._get_eps_greedy_coeff()
-        if np.random.uniform(0, 1) < eps_greedy_coeff:
-            action_idx = np.random.choice(self.trainer.action_set)
-        else:
-            model = self.trainer.model
-            with torch.no_grad():
-                pr_rewards: torch.Tensor = model(
-                    batch_world_states_tensor=world_state_tensor.unsqueeze(0).to(model.device))
-                pr_rewards = pr_rewards.squeeze(0).cpu()
-            for action_idx in range(pr_rewards.shape[0]):
-                if action_idx not in self.trainer.action_set:
-                    pr_rewards[action_idx] = -10000
-            action_idx = pr_rewards.argmax(0)
-        return int(action_idx)

@@ -4,6 +4,9 @@ import functools
 import torch
 from torch.nn import functional as F
 
+from daft_quick_nick.game_data import ModelDataProvider, WorldState, ActionState
+
+
 
 def get_model_num_params(model: torch.nn.Module) -> str:
     """
@@ -26,23 +29,22 @@ def get_model_num_params(model: torch.nn.Module) -> str:
 class CriticModel(torch.nn.Module):
     
     @staticmethod
-    def build_model(critic_cfg: tp.Dict[str, tp.Union[int, float]]) -> 'CriticModel':
-        return CriticModel(in_size=int(critic_cfg['in_size']),
-                           out_size=int(critic_cfg['out_size']),
-                           reward_decay=float(critic_cfg['reward_decay']),
-                           layers=[int(layer) for layer in list(critic_cfg['layers'])],
-                           dropout=float(critic_cfg['dropout']))
+    def build_model(data_provider: ModelDataProvider,
+                    model_cfg: tp.Dict[str, tp.Union[int, float]]) -> 'CriticModel':
+        return CriticModel(data_provider,
+                           reward_decay=float(model_cfg['reward_decay']),
+                           layers=[int(layer) for layer in list(model_cfg['layers'])],
+                           dropout=float(model_cfg['dropout']))
     
     def __init__(self,
-                 in_size: int,
-                 out_size: int,
+                 data_provider: ModelDataProvider,
                  reward_decay: float,
                  layers: tp.List[int],
                  dropout: float = 0.1):
         super().__init__()
         self.reward_decay = reward_decay
         
-        self.in_proj = torch.nn.Sequential(torch.nn.Linear(in_size, layers[0]), torch.nn.ReLU())
+        self.in_proj = torch.nn.Sequential(torch.nn.Linear(data_provider.WORLD_STATE_SIZE, layers[0]), torch.nn.ReLU())
         
         block_layers = []
         for layer_in, layar_out in zip(layers[:-1], layers[1:]):
@@ -50,7 +52,7 @@ class CriticModel(torch.nn.Module):
                                                     torch.nn.Linear(layer_in, layar_out),
                                                     torch.nn.ReLU()))
         self.blocks = torch.nn.Sequential(*block_layers)
-        self.out_proj = torch.nn.Linear(layers[-1], out_size, bias=True)
+        self.out_proj = torch.nn.Linear(layers[-1], data_provider.action_lookup_table.shape[0], bias=True)
     
     @property
     def device(self) -> torch.device:
