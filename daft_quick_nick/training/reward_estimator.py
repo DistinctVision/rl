@@ -4,7 +4,7 @@ import numpy as np
 
 from rlgym.utils.reward_functions import RewardFunction
 from rlgym.utils.gamestates import GameState, PlayerData
-from daft_quick_nick.util.constans import CAR_MAX_SPEED, BALL_RADIUS
+from daft_quick_nick.utils.constans import CAR_MAX_SPEED, BALL_RADIUS
 
 
 class RewardEstimator(RewardFunction):

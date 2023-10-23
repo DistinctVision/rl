@@ -1,10 +1,10 @@
 model:
-  layers: [512, 256]
+  layers: [256, 128]
   dropout: 0.0
   reward_decay: 0.99
 
-  critic_model_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/best_daft_quick_nick.kpt'
-  _critic_optimizer_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/opt_daft_quick_nick_640.kpt'
+  _critic_model_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/best_daft_quick_nick.kpt'
+  _critic_optimizer_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/opt_daft_quick_nick_500.kpt'
 
 replay_buffer:
   max_buffer_size: 500000
@@ -15,21 +15,22 @@ game:
   fps: 10
 
 training:
-  train_freq: 64
-  lr: 1e-3
+  train_freq: 8
+  is_double:  True
+  lr: 1e-4
   
-  batch_size: 512
+  batch_size: 256
   train_size: 0.9
   val_size: 0.1
   n_grad_accum_steps: 1
   grad_norm: 1.0
   fp16: False
 
-  n_local_steps: 100
+  n_local_steps: 1000
   model_update:
-    n_steps: 10
+    n_steps: 5
     type: soft
-    rate: 1e-2
+    rate: 1e-1
 
   output_folder: ../rl_output
   
@@ -41,6 +42,6 @@ training:
     target_op: '>'
     
   eps_greedy:
-    eps_from: 0.9
-    eps_to: 0.1
-    n_epochs_of_decays: 30000
+    eps_from: 0.95
+    eps_to: 0.05
+    n_epochs_of_decays: 1000000

@@ -49,7 +49,7 @@ def rlgym_training(num_instances: int):
     
     model_data_provider = ModelDataProvider()
     action_parser = GymActionParser(model_data_provider)
-    obs_builder = GymObsBuilder(model_data_provider)
+    obs_builder = GymObsBuilder(model_data_provider, use_mirror=True)
     reward_estimator = RewardEstimator(float(cfg['model']['reward_decay']))
     replay_buffer = ReplayBuffer()
     trainer = Trainer(cfg, replay_buffer)
@@ -61,7 +61,7 @@ def rlgym_training(num_instances: int):
     def get_match():
         return Match(
             reward_function=reward_estimator,
-            terminal_conditions=[TimeoutCondition(30 * 10), GoalScoredCondition()],
+            terminal_conditions=[TimeoutCondition(300 * 10), GoalScoredCondition()],
             obs_builder=obs_builder,
             state_setter=RandomBallGameState(),
             action_parser=action_parser,
@@ -92,7 +92,7 @@ def rlgym_training(num_instances: int):
             env.step_async(actions)
             
             if len(replay_buffer) > min_rp_data_size:
-                data_counter += num_instances * num_cars
+                data_counter += num_instances * num_cars * 2
                 if data_counter >= train_freq:
                     trainer.train_step()
                     data_counter = data_counter % train_freq
@@ -103,7 +103,11 @@ def rlgym_training(num_instances: int):
             for car_idx in range(num_instances * num_cars):
                 if done[car_idx]:
                     continue
-                ep_data_recorders[car_idx].record(obs[car_idx], actions[car_idx], 
+                original_obs = obs[car_idx][0, ...]
+                mirrored_obs = obs[car_idx][1, ...]
+                ep_data_recorders[car_idx].record(original_obs, actions[car_idx], 
+                                                  rewards[car_idx], next_done[car_idx])
+                ep_data_recorders[car_idx].record(mirrored_obs, actions[car_idx], 
                                                   rewards[car_idx], next_done[car_idx])
             
             ep_rewards += rewards

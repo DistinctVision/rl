@@ -5,16 +5,16 @@ import numpy as np
 import torch
 
 from rlgym.utils.obs_builders import ObsBuilder
-from rlgym.utils.gamestates import PlayerData, GameState
+from rlgym.utils.gamestates import PlayerData, GameState, PhysicsObject
 
 from daft_quick_nick.game_data import WorldState, BallInfo, EulerAngles, Vec3, PlayerInfo, ModelDataProvider
 
 
 class GymObsBuilder(ObsBuilder):
 
-    def __init__(self, data_provider: ModelDataProvider):
+    def __init__(self, data_provider: ModelDataProvider, use_mirror: bool = True):
         self.data_provider = data_provider
-        self.inverted = False
+        self.use_mirror = use_mirror
 
     def get_obs_space(self) -> gym.spaces.Space:
         return gym.spaces.Box(low=-np.inf, high=np.inf,
@@ -22,7 +22,7 @@ class GymObsBuilder(ObsBuilder):
                               dtype=np.float32)
 
     def reset(self, initial_state: GameState):
-        self.inverted = np.random.choice([True, False])
+        ...
 
     def pre_step(self, state: GameState):
         ...
@@ -37,40 +37,56 @@ class GymObsBuilder(ObsBuilder):
             enemy_data = p_player
         assert enemy_data is not None
         
-        enemy_car_data = enemy_data.car_data if self.inverted else enemy_data.inverted_car_data
-        
-        player_car_data = player.inverted_car_data if self.inverted else player.car_data
-        
-        ball_info = BallInfo(location=Vec3.from_array(ball_data.position),
-                             rotation=EulerAngles.from_array(ball_data.euler_angles()),
-                             velocity=Vec3.from_array(ball_data.linear_velocity),
-                             angular_velocity=Vec3.from_array(ball_data.angular_velocity))
-        
-        enemy_info = PlayerInfo(location=Vec3.from_array(enemy_car_data.position),
-                                rotation=EulerAngles.from_array(enemy_car_data.euler_angles()),
-                                velocity=Vec3.from_array(enemy_car_data.linear_velocity),
-                                angular_velocity=Vec3.from_array(enemy_car_data.angular_velocity),
-                                boost=enemy_data.boost_amount,
-                                is_demolished=enemy_data.is_demoed,
-                                has_wheel_contact=enemy_data.on_ground,
-                                is_super_sonic=True,
-                                jumped=enemy_data.has_jump,
-                                double_jumped=enemy_data.has_flip)
-        
-        agent_info = PlayerInfo(location=Vec3.from_array(player_car_data.position),
-                                rotation=EulerAngles.from_array(player_car_data.euler_angles()),
-                                velocity=Vec3.from_array(player_car_data.linear_velocity),
-                                angular_velocity=Vec3.from_array(player_car_data.angular_velocity),
-                                boost=player.boost_amount,
-                                is_demolished=player.is_demoed,
-                                has_wheel_contact=player.on_ground,
-                                is_super_sonic=True,
-                                jumped=player.has_jump,
-                                double_jumped=player.has_flip)
-        boosts = state.inverted_boost_pads if self.inverted else state.boost_pads
-        world_state = WorldState(ball=ball_info, players=[[agent_info], [enemy_info]], boosts=boosts)
-        
-        world_state_tensor = self.data_provider.world_state_to_tensor(world_state=world_state, agent_team_idx=0,
+        world_state = self._build_world_state(player,  player.car_data,
+                                              enemy_data, enemy_data.car_data,
+                                              state.ball,  state.boost_pads)
+        world_state_tensor = self.data_provider.world_state_to_tensor(world_state=world_state,
+                                                                      agent_team_idx=0,
                                                                       copy=False)
-        return world_state_tensor
+        if not self.use_mirror:
+            return world_state_tensor
+        
+        world_state = self._build_world_state(player, player.inverted_car_data,
+                                              enemy_data, enemy_data.inverted_car_data,
+                                              state.inverted_ball, state.inverted_boost_pads)
+        inverted_world_state_tensor = self.data_provider.world_state_to_tensor(world_state=world_state,
+                                                                               agent_team_idx=0,
+                                                                               copy=False)
+        return torch.stack([world_state_tensor, inverted_world_state_tensor])
+    
+    def _build_world_state(self, agent: PlayerData, agent_obj: PhysicsObject,
+                           enemy: PlayerData, enemy_obj: PhysicsObject,
+                           ball_obj: PhysicsObject, boost_pads: np.ndarray) -> WorldState:
+        
+        ball_info = BallInfo(location=Vec3.from_array(ball_obj.position),
+                             rotation=EulerAngles.from_array(ball_obj.euler_angles()),
+                             velocity=Vec3.from_array(ball_obj.linear_velocity),
+                             angular_velocity=Vec3.from_array(ball_obj.angular_velocity))
+        
+        agent_info = PlayerInfo(location=Vec3.from_array(agent_obj.position),
+                                rotation=EulerAngles.from_array(agent_obj.euler_angles()),
+                                velocity=Vec3.from_array(agent_obj.linear_velocity),
+                                angular_velocity=Vec3.from_array(agent_obj.angular_velocity),
+                                boost=agent.boost_amount,
+                                is_demolished=agent.is_demoed,
+                                has_wheel_contact=agent.on_ground,
+                                is_super_sonic=True,
+                                jumped=agent.has_jump,
+                                double_jumped=agent.has_flip)
+        
+        enemy_info = PlayerInfo(location=Vec3.from_array(enemy_obj.position),
+                                rotation=EulerAngles.from_array(enemy_obj.euler_angles()),
+                                velocity=Vec3.from_array(enemy_obj.linear_velocity),
+                                angular_velocity=Vec3.from_array(enemy_obj.angular_velocity),
+                                boost=enemy.boost_amount,
+                                is_demolished=enemy.is_demoed,
+                                has_wheel_contact=enemy.on_ground,
+                                is_super_sonic=True,
+                                jumped=enemy.has_jump,
+                                double_jumped=enemy.has_flip)
+        
+        world_state = WorldState(ball=ball_info, players=[[agent_info], [enemy_info]], boosts=boost_pads)
+        
+        return world_state
+        
     
