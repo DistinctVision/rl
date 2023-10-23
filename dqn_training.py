@@ -7,17 +7,12 @@ import numpy as np
 import torch
 
 from rlgym.envs import Match
-from rlgym.utils.reward_functions import DefaultReward
-from rlgym.utils.obs_builders import DefaultObs
-from rlgym.utils.state_setters import DefaultState
-from rlgym.utils.action_parsers import DefaultAction
 from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
-from rlgym.gamelaunch import LaunchPreference
 from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 
 from daft_quick_nick.game_data import ModelDataProvider
-from daft_quick_nick.training import Trainer, ReplayBuffer, EpisodeDataRecorder
-from daft_quick_nick.training import GymActionParser, GymObsBuilder, Trainer, RewardEstimator
+from daft_quick_nick.training import DqnTrainer, ReplayBuffer, DqnEpisodeDataRecorder
+from daft_quick_nick.training import GymActionParser, GymObsBuilder, RewardEstimator
 from daft_quick_nick.training import RandomBallGameState
 
 
@@ -42,7 +37,7 @@ def fix_data(data) -> tp.List[torch.Tensor]:
     return out
 
 
-def rlgym_training(num_instances: int):
+def dqn_training(num_instances: int):
     cfg = yaml.safe_load(open(Path('daft_quick_nick') / 'cfg.yaml', 'r'))
     replay_buffer_cfg = dict(cfg['replay_buffer'])
     min_rp_data_size = int(replay_buffer_cfg['min_buffer_size'])
@@ -52,11 +47,11 @@ def rlgym_training(num_instances: int):
     obs_builder = GymObsBuilder(model_data_provider, use_mirror=True)
     reward_estimator = RewardEstimator(float(cfg['model']['reward_decay']))
     replay_buffer = ReplayBuffer()
-    trainer = Trainer(cfg, replay_buffer)
+    trainer = DqnTrainer(cfg, replay_buffer)
         
     num_cars = 2
     
-    ep_data_recorders = [EpisodeDataRecorder(trainer) for _ in range(num_cars * num_instances)]
+    ep_data_recorders = [DqnEpisodeDataRecorder(trainer) for _ in range(num_cars * num_instances * 2)]
 
     def get_match():
         return Match(
@@ -105,10 +100,11 @@ def rlgym_training(num_instances: int):
                     continue
                 original_obs = obs[car_idx][0, ...]
                 mirrored_obs = obs[car_idx][1, ...]
-                ep_data_recorders[car_idx].record(original_obs, actions[car_idx], 
-                                                  rewards[car_idx], next_done[car_idx])
-                ep_data_recorders[car_idx].record(mirrored_obs, actions[car_idx], 
-                                                  rewards[car_idx], next_done[car_idx])
+                m_recorder_idx = car_idx * 2
+                ep_data_recorders[m_recorder_idx].record(original_obs, actions[car_idx], 
+                                                         rewards[car_idx], next_done[car_idx])
+                ep_data_recorders[m_recorder_idx + 1].record(mirrored_obs, actions[car_idx], 
+                                                        rewards[car_idx], next_done[car_idx])
             
             ep_rewards += rewards
             obs = next_obs
@@ -124,8 +120,8 @@ def rlgym_training(num_instances: int):
         
         rewards_str = ', '.join([f"{float(reward):.2f}" for reward in ep_rewards])
 
-        print(f'Episode: {ep_counter} | Replay buffer size: {len(replay_buffer)} | Mean rewards: {last_mean_reward:.2f} '\
-              f'| Episode Rewards: {rewards_str}')
+        print(f'Episode: {ep_counter} | Replay buffer size: {len(replay_buffer)} | '
+              f'Mean rewards: {last_mean_reward:.2f} | Episode Rewards: {rewards_str}')
     
     
 if __name__ == '__main__':
@@ -135,4 +131,4 @@ if __name__ == '__main__':
     args_parser.add_argument('-n', '--num_instances', type=int, default=1)
     args = args_parser.parse_args()
     
-    rlgym_training(args.num_instances)
+    dqn_training(args.num_instances)

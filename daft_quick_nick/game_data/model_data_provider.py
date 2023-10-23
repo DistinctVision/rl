@@ -176,14 +176,14 @@ class ModelDataProvider:
                     for handbrake in (0, 1):
                         if boost == 1 and throttle != 1:
                             continue
-                        action_table.append([throttle or boost, 0, steer, 0, 0, boost, handbrake])
+                        action_table.append([throttle or boost, steer, 0, steer, 0, 0, boost, handbrake])
                         action_states.append(ActionState(steer=steer,
                                                          throttle=throttle or boost,
                                                          pitch=0, yaw=steer, roll=0,
                                                          jump=False, boost=boost > 0, handbrake=handbrake > 0,
                                                          use_item=False))
                         
-        print(f'Ground: {len(action_states)}')
+        # print(f'Ground: {len(action_states)}')
         
         # Aerial
         for pitch in (-1, 0, 1):
@@ -197,7 +197,7 @@ class ModelDataProvider:
                                 continue
                             # Enable handbrake for potential wavedashes
                             handbrake = jump == 1 and (pitch != 0 or yaw != 0 or roll != 0)
-                            action_table.append([boost, pitch, yaw, roll, jump, boost, handbrake])
+                            action_table.append([boost, yaw, pitch, yaw, roll, jump, boost, handbrake])
                             action_states.append(ActionState(steer=yaw,
                                                              throttle=boost,
                                                              pitch=pitch, yaw=yaw, roll=roll,
@@ -208,7 +208,7 @@ class ModelDataProvider:
     
     def action_state_to_action_idx(self, action_state: ActionState) -> int:
         steer_or_yaw = max(action_state.steer, action_state.yaw)
-        features = [action_state.throttle,
+        features = [action_state.throttle, steer_or_yaw,
                     action_state.pitch, steer_or_yaw, action_state.roll,
                     1.0 if action_state.jump else 0.0,
                     1.0 if action_state.boost else 0.0,

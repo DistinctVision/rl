@@ -1,13 +1,13 @@
 import numpy as np
 import torch
 
-from daft_quick_nick.training.trainer import Trainer
+from daft_quick_nick.training.dqn_trainer import DqnTrainer
 from daft_quick_nick.training.rp_data_types import RP_SeqOfRecords
         
 
-class EpisodeDataRecorder:
+class DqnEpisodeDataRecorder:
     
-    def __init__(self, trainer: Trainer):
+    def __init__(self, trainer: DqnTrainer):
         self.trainer = trainer
         self.current_episode = RP_SeqOfRecords()
     
@@ -20,18 +20,15 @@ class EpisodeDataRecorder:
     def record(self,
                world_state_tensor: torch.Tensor,
                action: int, reward: float,
-               episode_is_done: bool) -> bool:
+               episode_is_done: bool):
         self.current_episode.add(world_state_tensor.clone(), action, reward)
         
-        data_is_updated = False
         if episode_is_done:
-            data_is_updated = self.trainer.replay_buffer.add_episode(self.current_episode)
+            self.trainer.replay_buffer.add_episode(self.current_episode)
             self.current_episode = RP_SeqOfRecords()
             max_buffer_size = int(self.trainer.cfg['replay_buffer']['max_buffer_size'])
             while len(self.trainer.replay_buffer) > max_buffer_size:
                 self.trainer.replay_buffer.remove_first_episode()
-                
-        return data_is_updated
     
     def _get_action_idx(self, world_state_tensor: torch.Tensor) -> int:
         eps_greedy_coeff = self.trainer._get_eps_greedy_coeff()

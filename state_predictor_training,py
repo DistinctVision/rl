@@ -1,0 +1,135 @@
+import  typing as tp
+from pathlib import Path
+import yaml
+from collections import deque
+
+import numpy as np
+import torch
+
+from rlgym.envs import Match
+from rlgym.utils.reward_functions import DefaultReward
+from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
+from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
+
+from daft_quick_nick.game_data import ModelDataProvider
+from daft_quick_nick.training import StatePredictorTrainer, ReplayBuffer, StatePredictorEpisodeDataRecorder
+from daft_quick_nick.training import GymActionParser
+from daft_quick_nick.training import RandomBallGameState
+from Nexto.ext_nexto_obs_builder import ExtNextoObsBuilder, ExtNextoObsData
+from Nexto.agent import Agent as NextoAgent
+
+
+def fix_data(data) -> tp.List[ExtNextoObsData]:
+    """
+    This is a workaround to fix the bug inside sb3. Just reformat output data.
+    """
+    
+    if isinstance(data, ExtNextoObsData):
+        return [data]
+    out  = []
+    for d in data:
+        if isinstance(d, ExtNextoObsData):
+            out.append(d)
+            continue
+        if len(d) == 0:
+            continue
+        assert isinstance(d,  list)
+        for e in d:
+            assert isinstance(e, ExtNextoObsData)
+            out.append(e)
+    return out
+
+
+def state_predictor_training(num_instances: int):
+    cfg = yaml.safe_load(open(Path('daft_quick_nick') / 'cfg.yaml', 'r'))
+    training_cfg = dict(cfg['state_predictor_training'])
+    train_min_data_size = int(training_cfg['train_size']['min'])
+    val_min_data_size = int(training_cfg['val_size']['min'])
+    
+    agent = NextoAgent(result_as_index=True)
+    
+    model_data_provider = ModelDataProvider()
+    action_parser = GymActionParser(model_data_provider)
+    obs_builder = ExtNextoObsBuilder(model_data_provider, use_mirror=True)
+    train_replay_buffer = ReplayBuffer()
+    val_replay_buffer = ReplayBuffer()
+    trainer = StatePredictorTrainer(cfg, train_replay_buffer, val_replay_buffer)
+        
+    num_cars = 2
+    
+    ep_data_recorders = [StatePredictorEpisodeDataRecorder(train_replay_buffer, int(training_cfg['train_size']['max']),
+                                                           val_replay_buffer, int(training_cfg['val_size']['max']))
+                         for _ in range(num_cars * num_instances * 2)]
+
+    def get_match():
+        return Match(
+            reward_function=DefaultReward(),
+            terminal_conditions=[TimeoutCondition(300 * 10), GoalScoredCondition()],
+            obs_builder=obs_builder,
+            state_setter=RandomBallGameState(),
+            action_parser=action_parser,
+            game_speed=100, tick_skip=12, spawn_opponents=True, team_size=1
+        )
+
+    env = SB3MultipleInstanceEnv(match_func_or_matches=get_match,
+                                 num_instances=num_instances, wait_time=20)
+
+    ep_counter = 0
+    default_action_index = model_data_provider.default_action_index
+    
+    train_freq = int(training_cfg['train_freq'])
+    data_counter = 0
+    
+    while True:
+        obs = env.reset()
+        obs = fix_data(obs)
+        done = np.array([False for _ in  range(num_cars * num_instances)], dtype=bool)
+        
+        while not done.all():
+            actions = []
+            for car_obs, car_done in zip(obs, done):
+                if car_done:
+                    actions.append(default_action_index)
+                    continue
+                action = agent.act(car_obs.nexto_obs, 0.75)
+                actions.append(action)
+            
+            env.step_async(actions)
+            
+            next_obs, rewards, next_done, gameinfo = env.step_wait()
+            next_obs = fix_data(next_obs)
+
+            for car_idx in range(num_instances * num_cars):
+                if done[car_idx]:
+                    continue
+                original_obs = obs[car_idx].gym_obs[0, ...]
+                mirrored_obs = obs[car_idx].gym_obs[1, ...]
+                m_recorder_idx = car_idx * 2
+                ep_data_recorders[m_recorder_idx].record(original_obs, actions[car_idx], 
+                                                         None, next_done[car_idx])
+                ep_data_recorders[m_recorder_idx + 1].record(mirrored_obs, actions[car_idx], 
+                                                             None, next_done[car_idx])
+            
+            obs = next_obs
+            done = np.logical_or(done, next_done)
+            data_counter += num_instances * num_cars * 2
+        
+        ep_counter += 1
+
+        print(f'Episode: {ep_counter} | Train RP size: {len(train_replay_buffer)} | '\
+              f'Val RP size: {len(val_replay_buffer)}')
+        
+        if len(train_replay_buffer) >= train_min_data_size and len(val_replay_buffer) >= val_min_data_size:
+            if data_counter >= train_freq:
+                data_counter = data_counter % train_freq
+                trainer.train_epoch()
+        
+    
+if __name__ == '__main__':
+    from argparse import ArgumentParser
+    
+    args_parser = ArgumentParser()
+    args_parser.add_argument('-n', '--num_instances', type=int, default=1)
+    args = args_parser.parse_args()
+    
+    state_predictor_training(args.num_instances)

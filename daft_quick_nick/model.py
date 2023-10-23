@@ -22,7 +22,8 @@ def get_model_num_params(model: torch.nn.Module) -> str:
         if n_params > stage_n:
             stage_idx = idx
     
-    n_params /= stage_numbers[stage_idx]
+    if stage_idx > 0:
+        n_params /= stage_numbers[stage_idx]
     return f'{n_params}{stage_postfixes[stage_idx]}'
 
     

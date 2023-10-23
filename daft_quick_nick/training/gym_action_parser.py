@@ -22,7 +22,7 @@ class GymActionParser(ActionParser):
         action_arr = []
         for action_idx in actions:
             action = self.data_provider.action_lookup_table[action_idx]
-            [throttle, pitch, steer_or_yaw, roll, jump, boost, handbrake] = action
-            action_data = [boost or throttle, steer_or_yaw, steer_or_yaw, pitch, roll, jump, boost, handbrake]
+            [throttle, steer, pitch, yaw, roll, jump, boost, handbrake] = action
+            action_data = [throttle, steer, yaw, pitch, roll, jump, boost, handbrake]
             action_arr.append(action_data)
         return np.array(action_arr, dtype=np.float32)

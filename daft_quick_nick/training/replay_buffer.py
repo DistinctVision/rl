@@ -27,7 +27,8 @@ class ReplayBuffer:
         for ep_folder_path in tqdm(episode_paths,  desc=progress_desc):
             world_states = torch.load(ep_folder_path / 'world_states.pth')
             action_indices = torch.load(ep_folder_path / 'action_indices.pth')
-            rewards = torch.load(ep_folder_path / 'rewards.pth')
+            rewards_filepath = ep_folder_path / 'rewards.pth'
+            rewards = torch.load(rewards_filepath) if rewards_filepath.exists() else None
             episode = RP_RecordArray(world_states, action_indices, rewards)
             rp.buffer.append(episode)
         return rp
@@ -55,8 +56,8 @@ class ReplayBuffer:
     def get_record(self, episode_index: int, frame_index: int) -> RP_Record:
         episode = self.buffer[episode_index]
         return RP_Record(episode.world_states[frame_index,  :],
-                      int(episode.action_indices[frame_index]),
-                      float(episode.rewards[frame_index]))
+                         int(episode.action_indices[frame_index]),
+                         float(episode.rewards[frame_index]) if episode.rewards is not None else None)
 
     def add_episode(self, episode: RP_SeqOfRecords):
         self.buffer.append(RP_RecordArray.from_seq(episode))
@@ -77,7 +78,8 @@ class ReplayBuffer:
             episode = tp.cast(RP_RecordArray, episode)
             torch.save(episode.world_states, episode_folder / 'world_states.pth')
             torch.save(episode.action_indices, episode_folder / 'action_indices.pth')
-            torch.save(episode.rewards, episode_folder / 'rewards.pth')
+            if episode.rewards is not None:
+                torch.save(episode.rewards, episode_folder / 'rewards.pth')
             
     def sample_batch_indices(self, batch_size: int) -> tp.List[int]:
         batch_indices = []
@@ -87,15 +89,16 @@ class ReplayBuffer:
             batch_indices.append((rand_ep_idx, rand_record_idx))
         return batch_indices
     
-    def sample_batch(self, batch_indices: tp.List[tp.Tuple[int,  int]]) -> tp.Tuple[RP_RecordArray, RP_RecordArray,  torch.Tensor]:
-        cur_records: tp.List[RP_Record] = [self.get_record(idx[0], idx[1])
-                                        for idx in batch_indices]
+    def get_batch(self, batch_indices: tp.List[tp.Tuple[int,  int]]) \
+                -> tp.Tuple[RP_RecordArray, RP_RecordArray,  torch.Tensor]:
+        cur_records: tp.List[RP_Record] = [self.get_record(idx[0], idx[1]) for idx in batch_indices]
+        has_rewards = cur_records[0].reward is not None
         cur_batch = RP_RecordArray(world_states=torch.stack([record.world_state_tensor
-                                                          for record in cur_records]),
-                                action_indices=torch.tensor([record.action_index for record in cur_records],
-                                                            dtype=torch.int16),
-                                rewards=torch.tensor([record.reward
-                                                      for record in cur_records], dtype=torch.float32))
+                                                            for record in cur_records]),
+                                   action_indices=torch.tensor([record.action_index for record in cur_records],
+                                                               dtype=torch.int16),
+                                   rewards=torch.tensor([record.reward for record in cur_records],
+                                                        dtype=torch.float32) if has_rewards else None)
         
         next_records: tp.List[RP_Record] = []
         mask_done: tp.List[bool] = []
@@ -112,7 +115,37 @@ class ReplayBuffer:
                                     action_indices=torch.tensor([record.action_index
                                                                  for record in next_records],
                                                                 dtype=torch.int16),
-                                    rewards=torch.tensor([record.reward for record in next_records],
-                                                         dtype=torch.float32))
+                                    rewards=torch.tensor([record.reward for record in cur_records],
+                                                         dtype=torch.float32) if has_rewards else None)
         mask_done = torch.tensor(mask_done, dtype=torch.bool)
         return cur_batch, next_batch, mask_done
+    
+    def sample_seq_batch_indices(self, batch_size: int, sequence_size: int) -> tp.List[int]:
+        batch_indices = []
+        for _ in range(batch_size):
+            rand_ep_idx = random.randint(0, self.num_episodes - 1)
+            rand_record_idx = random.randint(0, self.num_records(rand_ep_idx) - sequence_size)
+            batch_indices.append((rand_ep_idx, rand_record_idx))
+        return batch_indices
+    
+    def get_seq_batch(self, batch_indices: tp.List[tp.Tuple[int,  int]], sequence_size: int) -> RP_RecordArray:
+        list_batch: tp.List[RP_RecordArray] = []
+        for idx in batch_indices:
+            episode: RP_RecordArray = self.buffer[idx[0]]
+            has_rewards = episode.rewards is not None
+            seq = RP_RecordArray(world_states=episode.world_states[idx[1]:idx[1] + sequence_size],
+                                 action_indices=episode.action_indices[idx[1]:idx[1] + sequence_size],
+                                 rewards=episode.rewards[idx[1]:idx[1] + sequence_size] if has_rewards else None)
+            list_batch.append(seq)
+        batch = RP_RecordArray(world_states=torch.stack([record.world_states for record in list_batch]),
+                               action_indices=torch.stack([record.action_indices for record in list_batch]),
+                               rewards=torch.stack([record.rewards for record in list_batch]) if has_rewards else None)
+        return batch
+    
+    def make_seq_indices(self, sequence_size: int) -> tp.List[tp.Tuple[int, int]]:
+        indices = []
+        for ep_idx, episode in enumerate(self.buffer):
+            for rec_idx in range(len(episode) - sequence_size):
+                indices.append((ep_idx, rec_idx))
+        return indices
+        

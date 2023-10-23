@@ -24,7 +24,7 @@ class TrainingData:
     progress_bar: tp.Optional[tqdm] = None
     
 
-class Trainer:
+class DqnTrainer:
 
     def __init__(self,
                  cfg: tp.Dict[str, tp.Any],
@@ -100,7 +100,7 @@ class Trainer:
         run_name = get_run_name('dqn_%dt')
         run_output_folder = make_output_folder(training_cfg['output_folder'], run_name, False)
         
-        logging.basicConfig(filename=run_output_folder / 'dqn.log',
+        logging.basicConfig(filename=run_output_folder / 'log.txt',
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                             datefmt='%d-%b-%y %H:%M:%S',
                             level=logging.INFO)
@@ -169,7 +169,7 @@ class Trainer:
             grad_scaler = torch.cuda.amp.GradScaler(enabled=False)
         
         batch_indices = self.replay_buffer.sample_batch_indices(batch_size)
-        cur_records_batch, next_records_batch, mask_done = self.replay_buffer.sample_batch(batch_indices)
+        cur_records_batch, next_records_batch, mask_done = self.replay_buffer.get_batch(batch_indices)
         sync_grad = (self._training_data.grad_accum_counter + 1) >= n_grad_accum_steps
                 
         with precision_ctx:

@@ -1,4 +1,12 @@
 model:
+  memory_size: 30
+  
+  rnn:
+    action_dim: 16
+    inner_dim: 128
+    hidden_dim: 128
+    n_lstm_layers: 2
+
   layers: [256, 128]
   dropout: 0.0
   reward_decay: 0.99
@@ -6,13 +14,13 @@ model:
   _critic_model_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/best_daft_quick_nick.kpt'
   _critic_optimizer_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/opt_daft_quick_nick_500.kpt'
 
+game:
+  fps: 10
+
 replay_buffer:
   max_buffer_size: 500000
   min_buffer_size: 1000
   _data_dir: ../gym_output/dqn_10_19_2023__15_29_00/weights
-
-game:
-  fps: 10
 
 training:
   train_freq: 8
@@ -20,8 +28,6 @@ training:
   lr: 1e-4
   
   batch_size: 256
-  train_size: 0.9
-  val_size: 0.1
   n_grad_accum_steps: 1
   grad_norm: 1.0
   fp16: False
@@ -45,3 +51,32 @@ training:
     eps_from: 0.95
     eps_to: 0.05
     n_epochs_of_decays: 1000000
+
+state_predictor_training:
+  train_freq: 25600
+  lr: 1e-4
+  
+  batch_size: 256
+  train_size:
+    min: 25600
+    max: 256000
+    for_epoch: 25600
+  val_size:
+    min: 2560
+    max: 25600
+    for_epoch: 25600
+  
+  n_grad_accum_steps: 1
+  grad_norm: 1.0
+  fp16: False
+
+  n_local_steps: 1000
+
+  output_folder: ../state_predictor_output
+  
+  save:
+    model_name: state_predictor
+    save_every_n_step: 10
+    n_last_steps: 100
+    target_metric: val.num_loss
+    target_op: '>'
