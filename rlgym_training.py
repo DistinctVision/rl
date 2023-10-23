@@ -87,7 +87,7 @@ def rlgym_training(num_instances: int):
         ep_rewards = np.zeros((num_instances * num_cars), dtype=float)
         
         while not done.all():
-            actions = [ep_data_recorder.get_action(car_obs) if not car_done else default_action_index
+            actions = [ep_data_recorder.get_action(car_obs[0, ...]) if not car_done else default_action_index
                        for ep_data_recorder, car_obs, car_done in zip(ep_data_recorders, obs, done)]
             env.step_async(actions)
             

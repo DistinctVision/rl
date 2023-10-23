@@ -28,8 +28,6 @@ class GymObsBuilder(ObsBuilder):
         ...
 
     def build_obs(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> torch.Tensor:
-        ball_data = state.inverted_ball if self.inverted else state.ball
-        
         enemy_data: tp.Optional[PlayerData] = None
         for p_player in state.players:
             if p_player.car_id == player.car_id:
