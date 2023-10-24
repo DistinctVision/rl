@@ -109,10 +109,10 @@ def state_predictor_training(num_instances: int):
                                                          None, next_done[car_idx])
                 ep_data_recorders[m_recorder_idx + 1].record(mirrored_obs, actions[car_idx], 
                                                              None, next_done[car_idx])
+                data_counter += 2
             
             obs = next_obs
             done = np.logical_or(done, next_done)
-            data_counter += num_instances * num_cars * 2
         
         ep_counter += 1
 

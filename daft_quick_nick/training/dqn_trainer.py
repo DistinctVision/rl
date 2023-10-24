@@ -44,8 +44,8 @@ class DqnTrainer:
 
         self.log_writer: tp.Optional[LogWriter] = None
 
-        self._init_models()
         self._init_log()
+        self._init_models()
         
         training_cfg = dict(self.cfg['training'])
         n_local_steps = int(training_cfg['n_local_steps'])

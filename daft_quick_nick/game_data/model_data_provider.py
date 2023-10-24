@@ -102,8 +102,8 @@ class ModelDataProvider:
         return torch.tensor(features, dtype=torch.float32, device=device)
     
     def tensor_to_world_state(self, tensor: torch.Tensor,
-                              agent_team_idx: tp.Union[int, tp.List[int]],
-                              copy: bool = True) -> tp.Union[WorldState, tp.List[WorldState]]:
+                              agent_team_idx: tp.Union[int, tp.List[int]]) -> tp.Union[WorldState,
+                                                                                       tp.List[WorldState]]:
         assert agent_team_idx in {0, 1}
         
         if len(tensor.shape) == 1:
@@ -152,7 +152,7 @@ class ModelDataProvider:
             
             teams = [[agent_info], [enemy_info]] if team_idx == 0 else [[enemy_info], [agent_info]]
             world_state = WorldState(ball=ball, players=teams, boosts=None)
-            world_state = self.data_scaler.unscale(world_state, copy=copy)
+            world_state = self.data_scaler.unscale(world_state, copy=True)
             out.append(world_state)
         return out if is_batch else out[0]
     

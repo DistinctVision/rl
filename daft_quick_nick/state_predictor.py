@@ -47,7 +47,10 @@ class RnnCoreModel(torch.nn.Module):
         
     def forward(self,
                 batch_world_states_tensor: torch.Tensor,
-                batch_action_indices: torch.Tensor) -> tp.Tuple[torch.Tensor, torch.Tensor]:
+                batch_action_indices: torch.Tensor,*,
+                hidden: tp.Optional[tp.Tuple[torch.Tensor, torch.Tensor]] = None) -> tp.Tuple[torch.Tensor,
+                                                                                              tp.Tuple[torch.Tensor,
+                                                                                                       torch.Tensor]]:
         assert len(batch_world_states_tensor.shape) == 3 and len(batch_action_indices.shape) == 2
         assert batch_world_states_tensor.shape[0] == batch_action_indices.shape[0] and \
             batch_world_states_tensor.shape[1] == batch_action_indices.shape[1]
@@ -56,9 +59,25 @@ class RnnCoreModel(torch.nn.Module):
         in_states = self.in_proj(batch_world_states_tensor)
         in_states = torch.cat([in_states, action_states_tensors], dim=-1)
         
-        rnn_out, (hidden_state, cell_state) = self.lstm(in_states)
-        hidden_state = hidden_state[-1, :, :]
-        return rnn_out, hidden_state
+        b, s, _ = in_states.shape
+        
+        device = in_states.device
+        
+        if hidden is None:
+            hidden = (torch.zeros(self.lstm.num_layers, b, self.lstm.hidden_size, device=device),
+                      torch.zeros(self.lstm.num_layers, b, self.lstm.hidden_size, device=device))
+        
+        hidden_seq = []
+        rnn_out_seq = []
+        
+        for seq_idx in range(s):
+            rnn_out, hidden = self.lstm(in_states[:, seq_idx:seq_idx+1, :], hidden)
+            hidden_seq.append(hidden)
+            rnn_out_seq.append(rnn_out)
+        
+        hidden = (torch.stack([h[0] for h in hidden_seq], dim=-2), torch.stack([h[1] for h in hidden_seq], dim=-2))
+        rnn_out = torch.cat([r for r in rnn_out_seq], dim=-2)
+        return rnn_out, hidden
         
 
 class StatePredictorModel(torch.nn.Module):
@@ -82,7 +101,7 @@ class StatePredictorModel(torch.nn.Module):
         self.data_provider = data_provider
         self.rnn_core = RnnCoreModel(data_provider.WORLD_STATE_SIZE, data_provider.num_actions,
                                      action_dim, inner_dim, hidden_dim, n_lstm_layers)
-        v_state_size = inner_dim + hidden_dim
+        v_state_size = inner_dim + hidden_dim * n_lstm_layers
         self.out_projector = torch.nn.Sequential(torch.nn.Linear(v_state_size, v_state_size * 4),
                                                  torch.nn.ReLU(),
                                                  torch.nn.Linear(v_state_size * 4,
@@ -115,10 +134,13 @@ class StatePredictorModel(torch.nn.Module):
         torch.nn.init.uniform_(self.out_projector[2].bias, a=-5e-3, b=5e-3)
     
     def forward(self,
-                batch_world_states_tensor: tp.Optional[torch.Tensor] = None,
-                batch_action_indices: tp.Optional[torch.Tensor] = None,
-                return_losses: bool = False) \
-                    -> tp.Union[tp.List[WorldState], torch.Tensor, tp.Dict[str, tp.Union[torch.Tensor, float]]]:
+                batch_world_states_tensor: tp.Optional[torch.Tensor],
+                batch_action_indices: tp.Optional[torch.Tensor],
+                return_losses: bool = False,
+                prev_rnn_hidden: tp.Optional[tp.Tuple[torch.Tensor, torch.Tensor]] = None,
+                return_rnn_hidden: bool = False) -> tp.Union[torch.Tensor,
+                                                             tp.Tuple[torch.Tensor,  torch.Tensor],
+                                                             tp.Dict[str, tp.Union[torch.Tensor, float]]]:
         
         if return_losses:
             target_world_states_tensor = batch_world_states_tensor[:, 1:, :]
@@ -128,16 +150,19 @@ class StatePredictorModel(torch.nn.Module):
         assert batch_world_states_tensor.shape[0] == batch_action_indices.shape[0] and \
             batch_world_states_tensor.shape[1] == batch_action_indices.shape[1]
         
-        rnn_output, hidden_state = self.rnn_core(batch_world_states_tensor, batch_action_indices)
-        
-        hidden_state = einops.repeat(hidden_state, 'b d -> b s d', s=rnn_output.shape[1])
-        rnn_output = torch.cat([rnn_output, hidden_state], dim=-1)
-        output = self.out_projector(rnn_output)
+        rnn_output, (hidden_state, cell_state) = self.rnn_core(batch_world_states_tensor, batch_action_indices,
+                                                               hidden=prev_rnn_hidden)
+        rnn_output = torch.cat([rnn_output] + [hidden_state[idx, :, :, :] for idx in range(hidden_state.shape[0])],
+                               dim=-1)
+        output: torch.Tensor = self.out_projector(rnn_output)
         cat_feat_mask = einops.repeat(self.cat_feat_mask, 'd -> b s d', b=rnn_output.shape[0], s=rnn_output.shape[1])
         
         if not return_losses:
             output[cat_feat_mask] = torch.sigmoid(output[cat_feat_mask])
             output = output[:, -1, :]
+            
+            if return_rnn_hidden:
+                return output, (hidden_state, cell_state)
             return output
         
         pr_num_features = output.index_select(dim=2, index=self.num_feat_indices)

@@ -3,9 +3,12 @@ model:
   
   rnn:
     action_dim: 16
-    inner_dim: 128
-    hidden_dim: 128
+    inner_dim: 256
+    hidden_dim: 256
     n_lstm_layers: 2
+
+    _state_predictor_path: '../state_predictor_1360.kpt'
+    _state_predictor_optimizer_path: '../opt_state_predictor_1360.kpt'
 
   layers: [256, 128]
   dropout: 0.0
@@ -53,18 +56,18 @@ training:
     n_epochs_of_decays: 1000000
 
 state_predictor_training:
-  train_freq: 25600
+  train_freq: 16000
   lr: 1e-4
   
-  batch_size: 256
+  batch_size: 512
   train_size:
-    min: 25600
-    max: 256000
-    for_epoch: 25600
+    min: 256000
+    max: 1024000
+    for_epoch: 256000
   val_size:
-    min: 2560
-    max: 25600
-    for_epoch: 25600
+    min: 25600
+    max: 102400
+    for_epoch: 256000
   
   n_grad_accum_steps: 1
   grad_norm: 1.0
@@ -72,11 +75,11 @@ state_predictor_training:
 
   n_local_steps: 1000
 
-  output_folder: ../state_predictor_output
+  output_folder: ../rl_output
   
   save:
     model_name: state_predictor
     save_every_n_step: 10
     n_last_steps: 100
     target_metric: val.num_loss
-    target_op: '>'
+    target_op: '<'

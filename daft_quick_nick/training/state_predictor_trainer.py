@@ -38,8 +38,8 @@ class StatePredictorTrainer:
 
         self.log_writer: tp.Optional[LogWriter] = None
 
-        self._init_model()
         self._init_log()
+        self._init_model()
         
 
     def _init_model(self):
@@ -48,8 +48,10 @@ class StatePredictorTrainer:
         training_cfg = dict(self.cfg['state_predictor_training'])
         
         self.model = StatePredictorModel.build_model(rnn_config, self.data_provider)
-        if 'state_model_path' in rnn_config:
-            ckpt = torch.load(str(rnn_config['state_model_path']), map_location='cpu')
+        model_path = rnn_config.get('state_predictor_path', None)
+        if model_path is not None:
+            model_path = Path(model_path)
+            ckpt = torch.load(model_path, map_location='cpu')
             self.model.load_state_dict(ckpt)
         else:
             self.model.init_weights()
@@ -62,7 +64,7 @@ class StatePredictorTrainer:
         self.optimizer = torch.optim.Adam(self.model.parameters(),
                                           lr=float(training_cfg['lr']),
                                           betas=(0.9, 0.999), eps=1e-8)
-        optimizer_path = model_cfg.get('critic_optimizer_path', None)
+        optimizer_path = rnn_config.get('state_predictor_optimizer_path', None)
         if optimizer_path is not None:
             optimizer_path = Path(optimizer_path)
             optimizer_ckpt = torch.load(optimizer_path)
