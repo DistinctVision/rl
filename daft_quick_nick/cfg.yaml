@@ -1,5 +1,5 @@
 model:
-  memory_size: 30
+  memory_size: 10
   
   rnn:
     action_dim: 16
@@ -7,8 +7,8 @@ model:
     hidden_dim: 256
     n_lstm_layers: 2
 
-    _state_predictor_path: '../state_predictor_1360.kpt'
-    _state_predictor_optimizer_path: '../opt_state_predictor_1360.kpt'
+    state_predictor_path: '../rl_output/state_predictor_10_24_2023__19_44_39/weights/state_predictor_960.kpt'
+    state_predictor_optimizer_path: '../rl_output/state_predictor_10_24_2023__19_44_39/weights/opt_state_predictor_960.kpt'
 
   layers: [256, 128]
   dropout: 0.0
@@ -58,8 +58,9 @@ training:
 state_predictor_training:
   train_freq: 16000
   lr: 1e-4
+  eps_greedy: 0.01
   
-  batch_size: 512
+  batch_size: 128
   train_size:
     min: 256000
     max: 1024000

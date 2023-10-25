@@ -78,6 +78,7 @@ def state_predictor_training(num_instances: int):
     default_action_index = model_data_provider.default_action_index
     
     train_freq = int(training_cfg['train_freq'])
+    eps_greedy = float(training_cfg['eps_greedy'])
     data_counter = 0
     
     while True:
@@ -89,9 +90,11 @@ def state_predictor_training(num_instances: int):
             actions = []
             for car_obs, car_done in zip(obs, done):
                 if car_done:
-                    actions.append(default_action_index)
-                    continue
-                action = agent.act(car_obs.nexto_obs, 0.75)
+                    action =  default_action_index
+                elif np.random.uniform(0, 1) < eps_greedy:
+                    action = np.random.randint(0, model_data_provider.num_actions - 1)
+                else:
+                    action = agent.act(car_obs.nexto_obs, 0.75)
                 actions.append(action)
             
             env.step_async(actions)

@@ -70,7 +70,7 @@ class StatePredictorDebugWrapper(tp.Generic[AgentType], BaseAgent):
         action_index = data_provider.action_state_to_action_idx(action_state)
         
         world_states_tensor = world_states_tensor.view(1, 1, -1).to(model.device)
-        action_indices_tensor = torch.tensor([action_index]).view(1, -1).to(model.device)
+        action_indices_tensor = torch.tensor([action_index]).view(1, 1).to(model.device)
         
         if self.state_predictor_data.last_world_states_tensor is None:
             self.state_predictor_data.last_world_states_tensor = world_states_tensor
@@ -92,7 +92,7 @@ class StatePredictorDebugWrapper(tp.Generic[AgentType], BaseAgent):
             rnn_hidden = self.state_predictor_data.rnn_hidden
             next_world_state_tensor, rnn_hidden = model(batch_world_states_tensor=world_states_tensor,
                                                         batch_action_indices=action_indices_tensor,
-                                                        rnn_hidden=None,
+                                                        prev_rnn_hidden=None,
                                                         return_rnn_hidden=True)
             self.state_predictor_data.rnn_hidden = rnn_hidden
             world_state = data_provider.tensor_to_world_state(next_world_state_tensor.flatten().cpu().detach(),
@@ -105,7 +105,7 @@ class StatePredictorDebugWrapper(tp.Generic[AgentType], BaseAgent):
             for _ in range(n_steps):
                 next_world_state_tensor, rnn_hidden = model(batch_world_states_tensor=world_states_tensor,
                                                             batch_action_indices=action_indices_tensor,
-                                                            rnn_hidden=None,
+                                                            prev_rnn_hidden=None,
                                                             return_rnn_hidden=True)
                 world_state = data_provider.tensor_to_world_state(next_world_state_tensor.flatten().cpu().detach(),
                                                                   agent_team_idx=0)
@@ -115,12 +115,7 @@ class StatePredictorDebugWrapper(tp.Generic[AgentType], BaseAgent):
                 action_indices_tensor = action_indices_tensor[:, -30:]
                 out_world_states.append(world_state)
         dt = time.time() - t0
-        print(f'dt={dt:.3f}')
-                
-        if not packet.game_info.is_round_active:
-            self.state_predictor_data.rnn_hidden = None
-            self.state_predictor_data.last_world_states_tensor = None
-            self.state_predictor_data.last_action_indices_tensor = None
+        # print(f'dt={dt:.3f}')
                 
         return out_world_states
         
@@ -143,17 +138,22 @@ class StatePredictorDebugWrapper(tp.Generic[AgentType], BaseAgent):
         if not packet.game_info.is_round_active:
             self.state_predictor_data.last_time_tick = None
             self.state_predictor_data.last_world_states = []
+            self.state_predictor_data.rnn_hidden = None
+            self.state_predictor_data.last_world_states_tensor = None
+            self.state_predictor_data.last_action_indices_tensor = None
             return controls
         
         time_tick = packet.game_info.seconds_elapsed
         
         if self.state_predictor_data.last_time_tick is not None:
-            if (time_tick - self.state_predictor_data.last_time_tick) < 1.0 / self.state_predictor_data.fps:
+            if (time_tick - self.state_predictor_data.last_time_tick) < (1.0 / self.state_predictor_data.fps) * 0.9:
                 if self.state_predictor_data.last_world_states:
                     self.draw_state_debug(self.state_predictor_data.last_world_states)
                 return controls
+            dt = time_tick - self.state_predictor_data.last_time_tick
+            print(f'dt={dt:.3f}')
         
-        self.state_predictor_data.last_world_states = self.predict(packet, controls, 5)
+        self.state_predictor_data.last_world_states = self.predict(packet, controls, 1)
         self.draw_state_debug(self.state_predictor_data.last_world_states)
         self.state_predictor_data.last_time_tick = time_tick
         return controls
