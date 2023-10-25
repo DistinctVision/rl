@@ -67,15 +67,11 @@ class RnnCoreModel(torch.nn.Module):
             hidden = (torch.zeros(self.lstm.num_layers, b, self.lstm.hidden_size, device=device),
                       torch.zeros(self.lstm.num_layers, b, self.lstm.hidden_size, device=device))
         
-        hidden_seq = []
         rnn_out_seq = []
-        
         for seq_idx in range(s):
             rnn_out, hidden = self.lstm(in_states[:, seq_idx:seq_idx+1, :], hidden)
-            hidden_seq.append(hidden)
             rnn_out_seq.append(rnn_out)
         
-        hidden = (torch.stack([h[0] for h in hidden_seq], dim=-2), torch.stack([h[1] for h in hidden_seq], dim=-2))
         rnn_out = torch.cat([r for r in rnn_out_seq], dim=-2)
         return rnn_out, hidden
         
@@ -101,7 +97,7 @@ class StatePredictorModel(torch.nn.Module):
         self.data_provider = data_provider
         self.rnn_core = RnnCoreModel(data_provider.WORLD_STATE_SIZE, data_provider.num_actions,
                                      action_dim, inner_dim, hidden_dim, n_lstm_layers)
-        v_state_size = inner_dim + hidden_dim * n_lstm_layers
+        v_state_size = hidden_dim
         self.out_projector = torch.nn.Sequential(torch.nn.Linear(v_state_size, v_state_size * 4),
                                                  torch.nn.ReLU(),
                                                  torch.nn.Linear(v_state_size * 4,
@@ -152,8 +148,6 @@ class StatePredictorModel(torch.nn.Module):
         
         rnn_output, (hidden_state, cell_state) = self.rnn_core(batch_world_states_tensor, batch_action_indices,
                                                                hidden=prev_rnn_hidden)
-        rnn_output = torch.cat([rnn_output] + [hidden_state[idx, :, :, :] for idx in range(hidden_state.shape[0])],
-                               dim=-1)
         output: torch.Tensor = self.out_projector(rnn_output)
         cat_feat_mask = einops.repeat(self.cat_feat_mask, 'd -> b s d', b=rnn_output.shape[0], s=rnn_output.shape[1])
         

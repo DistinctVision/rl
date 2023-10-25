@@ -1,10 +1,9 @@
 import  typing as tp
 from pathlib import Path
+import random
 import yaml
-from collections import deque
 
 import numpy as np
-import torch
 
 from rlgym.envs import Match
 from rlgym.utils.reward_functions import DefaultReward
@@ -82,19 +81,22 @@ def state_predictor_training(num_instances: int):
     data_counter = 0
     
     while True:
+        
+        nexto_betas = [random.uniform(0.3, 1.0) for _ in range(num_cars * num_instances)]
+        
         obs = env.reset()
         obs = fix_data(obs)
         done = np.array([False for _ in  range(num_cars * num_instances)], dtype=bool)
         
         while not done.all():
             actions = []
-            for car_obs, car_done in zip(obs, done):
+            for car_obs, car_done, nexto_beta in zip(obs, done, nexto_betas):
                 if car_done:
                     action =  default_action_index
                 elif np.random.uniform(0, 1) < eps_greedy:
                     action = np.random.randint(0, model_data_provider.num_actions - 1)
                 else:
-                    action = agent.act(car_obs.nexto_obs, 0.75)
+                    action = agent.act(car_obs.nexto_obs, nexto_beta)
                 actions.append(action)
             
             env.step_async(actions)
