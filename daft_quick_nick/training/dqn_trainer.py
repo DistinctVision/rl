@@ -183,7 +183,7 @@ class DqnTrainer:
         sync_grad = (self._training_data.grad_accum_counter + 1) >= n_grad_accum_steps
                 
         with precision_ctx:
-            batch_world_states_tensor = next_records_batch.world_states.to(self.device)
+            batch_world_states_tensor = next_records_batch.world_states.unsqueeze(1).to(self.device)
             batch_prev_rnn_outputs = self.rnn_core_model.unflat_rnn_output(next_records_batch.prev_rnn_outputs)
             batch_prev_rnn_outputs = (batch_prev_rnn_outputs[0].to(self.device), 
                                       (batch_prev_rnn_outputs[1][0].to(self.device),
@@ -203,7 +203,7 @@ class DqnTrainer:
                 else:
                     next_pr_rewards = next_pr_rewards.max(-1)[0].detach()
                 
-            batch_world_states_tensor = cur_records_batch.world_states.to(self.device)
+            batch_world_states_tensor = cur_records_batch.world_states.unsqueeze(1).to(self.device)
             batch_prev_rnn_outputs = self.rnn_core_model.unflat_rnn_output(cur_records_batch.prev_rnn_outputs)
             batch_prev_rnn_outputs = (batch_prev_rnn_outputs[0].to(self.device), 
                                       (batch_prev_rnn_outputs[1][0].to(self.device),

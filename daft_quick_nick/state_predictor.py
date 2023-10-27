@@ -61,7 +61,7 @@ class RnnCoreModel(torch.nn.Module):
         for batch_item_idx in range(batch_size):
             in_vec = flat_in[batch_item_idx, :]
             vec_splits = (hidden_size, hidden_size+hidden_size*num_layers)
-            rnn_output = in_vec[:vec_splits[0]]
+            rnn_output = in_vec[:vec_splits[0]].unsqueeze(0)
             hidden_state = in_vec[vec_splits[0]:vec_splits[1]].view(num_layers, hidden_size)
             cell_state = in_vec[vec_splits[1]:].view(num_layers, hidden_size)
             rnn_outputs.append(rnn_output),
