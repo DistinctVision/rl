@@ -25,9 +25,6 @@ class StatePredictorDebugData:
     last_time_tick: tp.Optional[float] = None
     last_world_states: tp.List[WorldState] = field(default_factory=lambda: [])
     rnn_hidden: tp.Optional[tp.Tuple[torch.Tensor,  torch.Tensor]] = None
-    
-    last_world_states_tensor: tp.Optional[torch.Tensor] = None
-    last_action_indices_tensor: tp.Optional[torch.Tensor] = None
 
 
 class StatePredictorDebugWrapper(tp.Generic[AgentType], BaseAgent):
@@ -72,48 +69,28 @@ class StatePredictorDebugWrapper(tp.Generic[AgentType], BaseAgent):
         world_states_tensor = world_states_tensor.view(1, 1, -1).to(model.device)
         action_indices_tensor = torch.tensor([action_index]).view(1, 1).to(model.device)
         
-        if self.state_predictor_data.last_world_states_tensor is None:
-            self.state_predictor_data.last_world_states_tensor = world_states_tensor
-            self.state_predictor_data.last_action_indices_tensor = action_indices_tensor
-        else:
-            self.state_predictor_data.last_world_states_tensor = torch.cat([self.state_predictor_data.last_world_states_tensor,
-                                                                            world_states_tensor], dim=1)
-            self.state_predictor_data.last_action_indices_tensor = torch.cat([self.state_predictor_data.last_action_indices_tensor,
-                                                                              action_indices_tensor], dim=1)
-            self.state_predictor_data.last_world_states_tensor = self.state_predictor_data.last_world_states_tensor[:, -30:, :]
-            self.state_predictor_data.last_action_indices_tensor = self.state_predictor_data.last_action_indices_tensor[:, -30:]
-            
-        world_states_tensor = self.state_predictor_data.last_world_states_tensor
-        action_indices_tensor = self.state_predictor_data.last_action_indices_tensor
-        
         t0 = time.time()
         # with torch.no_grad(), torch.amp.autocast(device_type='cuda', dtype=torch.float16):
         with torch.no_grad():
             rnn_hidden = self.state_predictor_data.rnn_hidden
             next_world_state_tensor, rnn_hidden = model(batch_world_states_tensor=world_states_tensor,
                                                         batch_action_indices=action_indices_tensor,
-                                                        prev_rnn_hidden=None,
+                                                        prev_rnn_hidden=rnn_hidden,
                                                         return_rnn_hidden=True)
             self.state_predictor_data.rnn_hidden = rnn_hidden
             world_state = data_provider.tensor_to_world_state(next_world_state_tensor.flatten().cpu().detach(),
                                                               agent_team_idx=0)
             out_world_states.append(world_state)
-            world_states_tensor = torch.cat([world_states_tensor, next_world_state_tensor.unsqueeze(0)], dim=1)
-            action_indices_tensor = torch.cat([action_indices_tensor, action_indices_tensor[:, -1:]], dim=1)
-            world_states_tensor = world_states_tensor[:, -30:, :]
-            action_indices_tensor = action_indices_tensor[:, -30:]
+            world_states_tensor =  next_world_state_tensor.unsqueeze(0)
             for _ in range(n_steps):
                 next_world_state_tensor, rnn_hidden = model(batch_world_states_tensor=world_states_tensor,
                                                             batch_action_indices=action_indices_tensor,
-                                                            prev_rnn_hidden=None,
+                                                            prev_rnn_hidden=rnn_hidden,
                                                             return_rnn_hidden=True)
                 world_state = data_provider.tensor_to_world_state(next_world_state_tensor.flatten().cpu().detach(),
                                                                   agent_team_idx=0)
-                world_states_tensor = torch.cat([world_states_tensor, next_world_state_tensor.unsqueeze(0)], dim=1)
-                action_indices_tensor = torch.cat([action_indices_tensor, action_indices_tensor[:, -1:]], dim=1)
-                world_states_tensor = world_states_tensor[:, -30:, :]
-                action_indices_tensor = action_indices_tensor[:, -30:]
                 out_world_states.append(world_state)
+                world_states_tensor =  next_world_state_tensor.unsqueeze(0)
         dt = time.time() - t0
         # print(f'dt={dt:.3f}')
                 
@@ -139,8 +116,6 @@ class StatePredictorDebugWrapper(tp.Generic[AgentType], BaseAgent):
             self.state_predictor_data.last_time_tick = None
             self.state_predictor_data.last_world_states = []
             self.state_predictor_data.rnn_hidden = None
-            self.state_predictor_data.last_world_states_tensor = None
-            self.state_predictor_data.last_action_indices_tensor = None
             return controls
         
         time_tick = packet.game_info.seconds_elapsed
@@ -153,7 +128,7 @@ class StatePredictorDebugWrapper(tp.Generic[AgentType], BaseAgent):
             dt = time_tick - self.state_predictor_data.last_time_tick
             print(f'dt={dt:.3f}')
         
-        self.state_predictor_data.last_world_states = self.predict(packet, controls, 1)
+        self.state_predictor_data.last_world_states = self.predict(packet, controls, 10)
         self.draw_state_debug(self.state_predictor_data.last_world_states)
         self.state_predictor_data.last_time_tick = time_tick
         return controls

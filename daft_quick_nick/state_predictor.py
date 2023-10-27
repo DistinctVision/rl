@@ -98,9 +98,9 @@ class StatePredictorModel(torch.nn.Module):
         self.rnn_core = RnnCoreModel(data_provider.WORLD_STATE_SIZE, data_provider.num_actions,
                                      action_dim, inner_dim, hidden_dim, n_lstm_layers)
         v_state_size = hidden_dim
-        self.out_projector = torch.nn.Sequential(torch.nn.Linear(v_state_size, v_state_size * 4),
+        self.out_projector = torch.nn.Sequential(torch.nn.Linear(v_state_size, v_state_size * 2),
                                                  torch.nn.ReLU(),
-                                                 torch.nn.Linear(v_state_size * 4,
+                                                 torch.nn.Linear(v_state_size * 2,
                                                                  ModelDataProvider.WORLD_STATE_SIZE))
         cat_flags = ModelDataProvider.world_state_categorial_flags()
         cat_feat_indices = torch.tensor([idx for idx, flag in enumerate(cat_flags) if flag], dtype=torch.long)
@@ -139,7 +139,7 @@ class StatePredictorModel(torch.nn.Module):
                                                              tp.Dict[str, tp.Union[torch.Tensor, float]]]:
         
         if return_losses:
-            target_world_states_tensor = batch_world_states_tensor[:, 1:, :]
+            target_world_states_tensor = batch_world_states_tensor[:, 1:, :].detach()
             batch_world_states_tensor = batch_world_states_tensor[:, :-1, :]
         
         assert len(batch_world_states_tensor.shape) == 3 and len(batch_action_indices.shape) == 2
@@ -180,19 +180,19 @@ class StatePredictorModel(torch.nn.Module):
         
         with torch.no_grad():
             losses = {
-                'ball/location': get_vec_error(num_losses[:, :, 0:3]) * pos_scale,
-                'ball/velocity': get_vec_error(num_losses[:, :, 3:6]) * pos_scale,
-                'agent/location': get_vec_error(num_losses[:, :, 6:9]) * pos_scale,
+                'ball/location': get_vec_error(num_losses[:, :, 0:3]),
+                'ball/velocity': get_vec_error(num_losses[:, :, 3:6]),
+                'agent/location': get_vec_error(num_losses[:, :, 6:9]),
                 'agent/q': get_vec_error(num_losses[:, :, 9:13]),
-                'agent/velocity': get_vec_error(num_losses[:, :, 13:16]) * pos_scale,
-                'agent/angular_velocity': get_vec_error(num_losses[:, :, 16:19]) * angle_scale,
-                'agent/boost': get_vec_error(num_losses[:, :, 19:20]) * 100,
-                'player/location': get_vec_error(num_losses[:, :, 20:23]) * pos_scale,
+                'agent/velocity': get_vec_error(num_losses[:, :, 13:16]),
+                'agent/angular_velocity': get_vec_error(num_losses[:, :, 16:19]),
+                'agent/boost': get_vec_error(num_losses[:, :, 19:20]),
+                'player/location': get_vec_error(num_losses[:, :, 20:23]),
                 'player/q': get_vec_error(num_losses[:, :, 23:27]),
-                'player/velocity': get_vec_error(num_losses[:, :, 27:30]) * pos_scale,
-                'player/angular_velocity': get_vec_error(num_losses[:, :, 30:33]) * angle_scale,
-                'player/boost': get_vec_error(num_losses[:, :, 33:34]) * 100,
-                'dist_to_ball': get_vec_error(num_losses[:, :, 34:35]) * pos_scale,
+                'player/velocity': get_vec_error(num_losses[:, :, 27:30]),
+                'player/angular_velocity': get_vec_error(num_losses[:, :, 30:33]),
+                'player/boost': get_vec_error(num_losses[:, :, 33:34]),
+                'dist_to_ball': get_vec_error(num_losses[:, :, 34:35]),
                 'agent/has_wheel_contact': get_cat_error(cat_losses[:, :, 0]),
                 'agent/is_super_sonic': get_cat_error(cat_losses[:, :, 1]),
                 'agent/jumped': get_cat_error(cat_losses[:, :, 2]),
@@ -202,9 +202,26 @@ class StatePredictorModel(torch.nn.Module):
                 'player/jumped': get_cat_error(cat_losses[:, :, 6]),
                 'player/double_jumped': get_cat_error(cat_losses[:, :, 7]),
             }
+            
+        ball_radius_sq = BALL_RADIUS * BALL_RADIUS
+        
+        num_losses[:, :, 0:9] /= ball_radius_sq
+        # num_losses[:, :, 9:13] *= 4
+        num_losses[:, :, 13:16] /= ball_radius_sq
+        num_losses[:, :, 16:19] /= ball_radius_sq
+        num_losses[:, :, 19:20] /= 100.0
+        num_losses[:, :, 20:23] /= ball_radius_sq
+        # num_losses[:, :, 23:27] *= 4
+        num_losses[:, :, 27:30] /= ball_radius_sq
+        num_losses[:, :, 30:33] /= ball_radius_sq
+        num_losses[:, :, 33:34] /= 100.0
+        num_losses[:, :, 34:35] /= ball_radius_sq
+        
+        # num_losses[:, :, 9:13] *= 0.1
+        # num_losses[:, :, 23:27] *= 0.1
         
         num_loss = num_losses.mean()
-        cat_loss = cat_losses.mean()
+        cat_loss = cat_losses.mean() * 0.05
             
         losses['num_loss'] = num_loss
         losses['cat_loss'] = cat_loss

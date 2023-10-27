@@ -3,12 +3,12 @@ model:
   
   rnn:
     action_dim: 32
-    inner_dim: 320
-    hidden_dim: 320
+    inner_dim: 1024
+    hidden_dim: 1024
     n_lstm_layers: 2
 
-    state_predictor_path: '../rl_output/state_predictor_10_25_2023__21_16_12/weights/state_predictor_40.kpt'
-    state_predictor_optimizer_path: '../rl_output/state_predictor_10_25_2023__21_16_12/weights/opt_state_predictor_40.kpt'
+    state_predictor_path: '../rl_output/state_predictor_10_27_2023__00_58_03/weights/state_predictor_230.kpt'
+    state_predictor_optimizer_path: '../rl_output/state_predictor_10_27_2023__00_58_03/weights/opt_state_predictor_230.kpt'
 
   layers: [256, 128]
   dropout: 0.0
@@ -60,7 +60,7 @@ state_predictor_training:
   lr: 3e-4
   eps_greedy: 0.01
   
-  batch_size: 128
+  batch_size: 256
   train_size:
     min: 256000
     max: 1024000

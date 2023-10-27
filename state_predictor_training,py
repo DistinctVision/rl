@@ -16,6 +16,7 @@ from daft_quick_nick.training import GymActionParser
 from daft_quick_nick.training import RandomBallGameState
 from Nexto.ext_nexto_obs_builder import ExtNextoObsBuilder, ExtNextoObsData
 from Nexto.agent import Agent as NextoAgent
+from daft_quick_nick.training.state_setter import NectoStateSetter
 
 
 def fix_data(data) -> tp.List[ExtNextoObsData]:
@@ -65,7 +66,8 @@ def state_predictor_training(num_instances: int):
             reward_function=DefaultReward(),
             terminal_conditions=[TimeoutCondition(300 * 10), GoalScoredCondition()],
             obs_builder=obs_builder,
-            state_setter=RandomBallGameState(),
+            # state_setter=RandomBallGameState(),
+            state_setter=NectoStateSetter(),
             action_parser=action_parser,
             game_speed=100, tick_skip=12, spawn_opponents=True, team_size=1
         )
