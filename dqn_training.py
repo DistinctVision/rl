@@ -10,6 +10,7 @@ from rlgym.envs import Match
 from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
 from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 
+from daft_quick_nick.state_predictor import StatePredictorModel
 from daft_quick_nick.game_data import ModelDataProvider
 from daft_quick_nick.training import DqnTrainer, ReplayBuffer, DqnEpisodeDataRecorder
 from daft_quick_nick.training import GymActionParser, GymObsBuilder, RewardEstimator
@@ -38,20 +39,27 @@ def fix_data(data) -> tp.List[torch.Tensor]:
 
 
 def dqn_training(num_instances: int):
+    device = 'cuda'
+    
     cfg = yaml.safe_load(open(Path('daft_quick_nick') / 'cfg.yaml', 'r'))
     replay_buffer_cfg = dict(cfg['replay_buffer'])
     min_rp_data_size = int(replay_buffer_cfg['min_buffer_size'])
     
     model_data_provider = ModelDataProvider()
+    state_predictor = StatePredictorModel.build_model(cfg['model'], model_data_provider)
+    rnn_backbone = state_predictor.rnn_core.to(device)
+    del state_predictor
+    
     action_parser = GymActionParser(model_data_provider)
     obs_builder = GymObsBuilder(model_data_provider, use_mirror=True)
     reward_estimator = RewardEstimator(float(cfg['model']['reward_decay']))
     replay_buffer = ReplayBuffer()
-    trainer = DqnTrainer(cfg, replay_buffer)
+    trainer = DqnTrainer(cfg, replay_buffer, device)
         
     num_cars = 2
     
-    ep_data_recorders = [DqnEpisodeDataRecorder(trainer) for _ in range(num_cars * num_instances * 2)]
+    ep_data_recorders = [DqnEpisodeDataRecorder(trainer, rnn_backbone=rnn_backbone)
+                         for _ in range(num_cars * num_instances * 2)]
 
     def get_match():
         return Match(
@@ -104,7 +112,7 @@ def dqn_training(num_instances: int):
                 ep_data_recorders[m_recorder_idx].record(original_obs, actions[car_idx], 
                                                          rewards[car_idx], next_done[car_idx])
                 ep_data_recorders[m_recorder_idx + 1].record(mirrored_obs, actions[car_idx], 
-                                                        rewards[car_idx], next_done[car_idx])
+                                                             rewards[car_idx], next_done[car_idx])
             
             ep_rewards += rewards
             obs = next_obs

@@ -13,7 +13,7 @@ from tqdm import tqdm
 from daft_quick_nick.training.log_writer import LogWriter, get_run_name, make_output_folder, BatchValueList
 from daft_quick_nick.training.replay_buffer import ReplayBuffer
 from daft_quick_nick.game_data import ModelDataProvider
-from daft_quick_nick.model import CriticModel, get_model_num_params
+from daft_quick_nick.model import RnnCoreModel, CriticModel, get_model_num_params
 
 
 @dataclass
@@ -28,12 +28,20 @@ class DqnTrainer:
 
     def __init__(self,
                  cfg: tp.Dict[str, tp.Any],
-                 replay_buffer: ReplayBuffer):
+                 replay_buffer: ReplayBuffer,
+                 device: tp.Union[torch.device, str] = 'cuda'):
         self.cfg = cfg
         self.logger = logging.getLogger(__name__)
-        self.device = torch.device('cuda:0')
+        self.device = device
 
+        rnn_model_cfg = dict(self.cfg['model']['rnn'])
         self.data_provider = ModelDataProvider()
+        self.rnn_core_model = RnnCoreModel(in_size=self.data_provider.WORLD_STATE_SIZE,
+                                           num_actions=self.data_provider.num_actions,
+                                           action_dim=int(rnn_model_cfg['action_dim']),
+                                           inner_dim=int(rnn_model_cfg['inner_dim']),
+                                           hidden_dim=int(rnn_model_cfg['hidden_dim']),
+                                           n_lstm_layers=int(rnn_model_cfg['n_lstm_layers']))
 
         # self.action_set = [action_idx for action_idx in range(int(self.cfg['model']['out_size']))]
         self.action_set = [0, 2, 4, 6, 8, 10, 12, 16, 20]
@@ -64,8 +72,10 @@ class DqnTrainer:
         model_cfg = dict(self.cfg['model'])
         training_cfg = dict(self.cfg['training'])
         
-        self.model = CriticModel.build_model(self.data_provider, model_cfg)
-        self.target_model = CriticModel.build_model(self.data_provider, model_cfg)
+        self.model = CriticModel.build_model(self.data_provider, model_cfg,
+                                             without_backbone=True)
+        self.target_model = CriticModel.build_model(self.data_provider, model_cfg,
+                                                    without_backbone=True)
         if 'critic_model_path' in model_cfg:
             ckpt = torch.load(str(model_cfg['critic_model_path']), map_location='cpu')
             self.target_model.load_state_dict(ckpt)
@@ -174,13 +184,19 @@ class DqnTrainer:
                 
         with precision_ctx:
             batch_world_states_tensor = next_records_batch.world_states.to(self.device)
+            batch_prev_rnn_outputs = self.rnn_core_model.unflat_rnn_output(next_records_batch.prev_rnn_outputs)
+            batch_prev_rnn_outputs = (batch_prev_rnn_outputs[0].to(self.device), 
+                                      (batch_prev_rnn_outputs[1][0].to(self.device),
+                                       batch_prev_rnn_outputs[1][1].to(self.device)))
             with torch.no_grad():
-                next_pr_rewards = self.model(batch_world_states_tensor=batch_world_states_tensor)
+                next_pr_rewards = self.model(batch_world_states_tensor=batch_world_states_tensor,
+                                             prev_rnn_output=batch_prev_rnn_outputs)
                 next_pr_rewards = tp.cast(torch.Tensor, next_pr_rewards)
                 next_pr_rewards[mask_done][:] = 0.0
                 if is_double:
                     next_pr_rewards_2: torch.Tensor = self.target_model(
-                        batch_world_states_tensor=batch_world_states_tensor)
+                        batch_world_states_tensor=batch_world_states_tensor,
+                        prev_rnn_output=batch_prev_rnn_outputs)
                     best_actions = next_pr_rewards_2.argmax(dim=-1).unsqueeze(0)
                     next_pr_rewards = next_pr_rewards.gather(dim=1, index=best_actions).detach()
                     next_pr_rewards.squeeze_(0)
@@ -188,9 +204,14 @@ class DqnTrainer:
                     next_pr_rewards = next_pr_rewards.max(-1)[0].detach()
                 
             batch_world_states_tensor = cur_records_batch.world_states.to(self.device)
+            batch_prev_rnn_outputs = self.rnn_core_model.unflat_rnn_output(cur_records_batch.prev_rnn_outputs)
+            batch_prev_rnn_outputs = (batch_prev_rnn_outputs[0].to(self.device), 
+                                      (batch_prev_rnn_outputs[1][0].to(self.device),
+                                       batch_prev_rnn_outputs[1][1].to(self.device)))
             rewards = (cur_records_batch.rewards.to(self.device) + next_pr_rewards * self.model.reward_decay)
             with nullcontext():
-                pr_rewards: torch.Tensor = self.target_model(batch_world_states_tensor=batch_world_states_tensor)
+                pr_rewards: torch.Tensor = self.target_model(batch_world_states_tensor=batch_world_states_tensor,
+                                                             prev_rnn_output=batch_prev_rnn_outputs)
                 action_indices = cur_records_batch.action_indices.unsqueeze(1).long().to(self.device)
                 pr_rewards = pr_rewards.gather(dim=1, index=action_indices).squeeze(1)
                 

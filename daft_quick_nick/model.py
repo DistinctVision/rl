@@ -1,11 +1,9 @@
 import typing as tp
-import math
 import functools
 import torch
-from torch.nn import functional as F
 
 from daft_quick_nick.game_data import ModelDataProvider
-
+from daft_quick_nick.state_predictor import RnnCoreModel, StatePredictorModel
 
 
 def get_model_num_params(model: torch.nn.Module) -> str:
@@ -24,21 +22,46 @@ def get_model_num_params(model: torch.nn.Module) -> str:
     
     if stage_idx > 0:
         n_params /= stage_numbers[stage_idx]
-    return f'{n_params}{stage_postfixes[stage_idx]}'
+        n_params_str = f'{n_params:.2f}'
+    else:
+        n_params_str = str(n_params)
+    return f'{n_params_str}{stage_postfixes[stage_idx]}'
 
     
 class CriticModel(torch.nn.Module):
     
     @staticmethod
     def build_model(data_provider: ModelDataProvider,
-                    model_cfg: tp.Dict[str, tp.Union[int, float]]) -> 'CriticModel':
-        return CriticModel(in_size=data_provider.WORLD_STATE_SIZE,
+                    model_cfg: tp.Dict[str, tp.Union[int, float]],
+                    without_backbone: bool = False) -> 'CriticModel':
+        in_size = data_provider.WORLD_STATE_SIZE
+        has_backbone = False
+        if 'rnn' in model_cfg:
+            rnn_config = dict(model_cfg['rnn'])
+            if without_backbone:
+                backbone = None
+            else:
+                state_predictor = StatePredictorModel.build_model(model_cfg, data_provider)
+                ckpt = torch.load(str(rnn_config['state_predictor_path']))
+                state_predictor.load_state_dict(ckpt)
+                backbone = state_predictor.rnn_core
+                backbone.freeze()
+            hidden_dim = int(rnn_config['hidden_dim'])
+            n_lstm_layers = int(rnn_config['n_lstm_layers'])
+            in_size += hidden_dim * (n_lstm_layers * 2 + 1)
+            has_backbone = True
+        else:
+            backbone = None
+        return CriticModel(has_backbone, backbone,
+                           in_size=in_size,
                            out_size=data_provider.num_actions,
                            reward_decay=float(model_cfg['reward_decay']),
                            layers=[int(layer) for layer in list(model_cfg['layers'])],
                            dropout=float(model_cfg['dropout']))
     
     def __init__(self,
+                 has_backbone: bool,
+                 backbone: tp.Optional[RnnCoreModel],
                  in_size: int,
                  out_size: int,
                  reward_decay: float,
@@ -47,6 +70,8 @@ class CriticModel(torch.nn.Module):
         super().__init__()
         self.reward_decay = reward_decay
         
+        self.has_backbone = has_backbone
+        self.backbone = backbone
         self.in_proj = torch.nn.Sequential(torch.nn.Linear(in_size, layers[0]), torch.nn.ReLU())
         
         block_layers = []
@@ -77,9 +102,27 @@ class CriticModel(torch.nn.Module):
         torch.nn.init.kaiming_uniform_(self.out_proj.weight)
         torch.nn.init.uniform_(self.out_proj.bias, a=-5e-3, b=5e-3)
     
-    def forward(self, batch_world_states_tensor: torch.Tensor) -> torch.Tensor:
+    def forward(self, 
+                batch_world_states_tensor: torch.Tensor, *,
+                batch_action_indices: tp.Optional[torch.Tensor] = None,
+                prev_rnn_output: tp.Optional[tp.Tuple[torch.Tensor,
+                                                      torch.Tensor,
+                                                      torch.Tensor]] = None) -> torch.Tensor:
         
-        in_state = batch_world_states_tensor
+        if self.has_backbone and prev_rnn_output is None:
+            assert self.backbone is not None
+            assert batch_action_indices is not None
+            prev_rnn_output = self.backbone(batch_world_states_tensor[:, :-1, :],
+                                            batch_action_indices[:, :])
+        
+        if self.has_backbone:
+            input_vecs = [batch_world_states_tensor[:, -1, :], prev_rnn_output[0][:, -1, :]]
+            for lstm_layer_idx in range(prev_rnn_output[1][0].shape[0]):
+                input_vecs += [prev_rnn_output[1][0][lstm_layer_idx, :, :],
+                               prev_rnn_output[1][1][lstm_layer_idx, :, :]]
+            in_state = torch.cat(input_vecs, dim=-1)
+        else:
+            in_state = batch_world_states_tensor[:, -1, :]
         
         x: torch.Tensor = self.in_proj(in_state)
         x = self.blocks(x)

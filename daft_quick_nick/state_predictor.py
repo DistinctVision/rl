@@ -29,6 +29,45 @@ class RnnCoreModel(torch.nn.Module):
     @property
     def device(self) -> torch.device:
         return self.action_embeddings.weight.device
+    
+    def make_default_rnn_output(self, batch_size: int = 1) \
+            -> tp.Tuple[torch.Tensor, tp.Tuple[torch.Tensor, torch.Tensor]]:
+        device = self.device
+        hidden_size = self.lstm.hidden_size
+        n_layers = self.lstm.num_layers
+        rnn_output = torch.zeros((batch_size, 1, hidden_size,), dtype=torch.float32, device=device)
+        hidden_state = torch.zeros((n_layers, batch_size, hidden_size,), dtype=torch.float32, device=device)
+        cell_state = torch.zeros((n_layers, batch_size, hidden_size,), dtype=torch.float32, device=device)
+        return rnn_output, (hidden_state, cell_state)
+    
+    def flat_rnn_output(self, out: tp.Tuple[torch.Tensor, tp.Tuple[torch.Tensor, torch.Tensor]]) -> torch.Tensor:
+        rnn_output, (hidden_state, cell_state) = out
+        batch_size = rnn_output.shape[0]
+        assert rnn_output.shape == (batch_size, 1, self.lstm.hidden_size)
+        assert hidden_state.shape == cell_state.shape == (self.lstm.num_layers, batch_size, self.lstm.hidden_size)
+        out_batch = []
+        for batch_item_idx in range(batch_size):
+            batch_out_el = torch.cat([rnn_output[batch_item_idx, -1, :],
+                                      hidden_state[:, batch_item_idx, :].flatten(),
+                                      cell_state[:, batch_item_idx, :].flatten()])
+            out_batch.append(batch_out_el)
+        return torch.stack(out_batch)
+    
+    def unflat_rnn_output(self, flat_in: torch.Tensor) -> tp.Tuple[torch.Tensor, tp.Tuple[torch.Tensor, torch.Tensor]]:
+        batch_size = flat_in.shape[0]
+        hidden_size = self.lstm.hidden_size
+        num_layers = self.lstm.num_layers
+        rnn_outputs, hidden_states, cell_states = [], [], []
+        for batch_item_idx in range(batch_size):
+            in_vec = flat_in[batch_item_idx, :]
+            vec_splits = (hidden_size, hidden_size+hidden_size*num_layers)
+            rnn_output = in_vec[:vec_splits[0]]
+            hidden_state = in_vec[vec_splits[0]:vec_splits[1]].view(num_layers, hidden_size)
+            cell_state = in_vec[vec_splits[1]:].view(num_layers, hidden_size)
+            rnn_outputs.append(rnn_output),
+            hidden_states.append(hidden_state)
+            cell_states.append(cell_state)
+        return torch.stack(rnn_outputs, dim=0), (torch.stack(hidden_states, dim=1), torch.stack(cell_states, dim=1))
         
     def init_weights(self):
         torch.nn.init.normal_(self.action_embeddings.weight)
@@ -81,11 +120,12 @@ class StatePredictorModel(torch.nn.Module):
     @staticmethod
     def build_model(model_state_cfg: tp.Dict[str, int],
                     data_provider: ModelDataProvider) -> 'StatePredictorModel':
+        rnn_config = dict(model_state_cfg['rnn'])
         return StatePredictorModel(data_provider=data_provider,
-                                   action_dim=int(model_state_cfg['action_dim']),
-                                   inner_dim=int(model_state_cfg['inner_dim']),
-                                   hidden_dim=int(model_state_cfg['hidden_dim']),
-                                   n_lstm_layers=int(model_state_cfg['n_lstm_layers']))
+                                   action_dim=int(rnn_config['action_dim']),
+                                   inner_dim=int(rnn_config['inner_dim']),
+                                   hidden_dim=int(rnn_config['hidden_dim']),
+                                   n_lstm_layers=int(rnn_config['n_lstm_layers']))
     
     def __init__(self,
                  data_provider: ModelDataProvider,
@@ -206,12 +246,12 @@ class StatePredictorModel(torch.nn.Module):
         ball_radius_sq = BALL_RADIUS * BALL_RADIUS
         
         num_losses[:, :, 0:9] /= ball_radius_sq
-        # num_losses[:, :, 9:13] *= 4
+        num_losses[:, :, 9:13] *= 10
         num_losses[:, :, 13:16] /= ball_radius_sq
         num_losses[:, :, 16:19] /= ball_radius_sq
         num_losses[:, :, 19:20] /= 100.0
         num_losses[:, :, 20:23] /= ball_radius_sq
-        # num_losses[:, :, 23:27] *= 4
+        num_losses[:, :, 23:27] *= 10
         num_losses[:, :, 27:30] /= ball_radius_sq
         num_losses[:, :, 30:33] /= ball_radius_sq
         num_losses[:, :, 33:34] /= 100.0
