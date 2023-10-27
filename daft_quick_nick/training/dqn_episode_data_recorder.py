@@ -51,9 +51,11 @@ class DqnEpisodeDataRecorder:
             self.current_episode.add(world_state_tensor.clone(), action, reward, prev_rnn_output_vec)
             world_state_tensor = world_state_tensor.view(1, 1, -1).to(device)
             action_indices = torch.tensor([action], dtype=torch.long, device=device).view(1, 1)
-            rnn_output = self._rnn_backbone(world_state_tensor, action_indices,
-                                            hidden=self._prev_rnn_output[1])
-            self._prev_rnn_output = rnn_output
+            with torch.no_grad():
+                rnn_output = self._rnn_backbone(world_state_tensor, action_indices,
+                                                hidden=self._prev_rnn_output[1])
+            self._prev_rnn_output = (rnn_output[0].detach(),
+                                     (rnn_output[1][0].detach(), rnn_output[1][1].detach()))
         else:
             self.current_episode.add(world_state_tensor.clone(), action, reward)
         

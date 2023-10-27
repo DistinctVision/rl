@@ -47,7 +47,8 @@ def dqn_training(num_instances: int):
     
     model_data_provider = ModelDataProvider()
     state_predictor = StatePredictorModel.build_model(cfg['model'], model_data_provider)
-    rnn_backbone = state_predictor.rnn_core.to(device)
+    rnn_backbone = state_predictor.rnn_core.to(device).eval()
+    rnn_backbone.freeze()
     del state_predictor
     
     action_parser = GymActionParser(model_data_provider)
