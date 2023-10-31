@@ -1,0 +1,42 @@
+model:
+  in_size: 43
+  out_size: 90
+
+  policy_net_layers: [256, 128]
+  value_net_layers: [256, 128]
+  dropout: 0.0
+
+  _models_path: '..\rl_output\ppo_10_31_2023__07_40_30\weights\ppo_595.kpt'
+  _optimizer_path: '..\rl_output\ppo_10_31_2023__07_40_30\weights\opt_ppo_595.kpt'
+  
+game:
+  fps: 10
+
+rollout:
+  observation_size: 43
+  max_buffer_size: 16384
+  calc_batch_size: 512
+  discount_factor: 0.99
+  gae_lambda: 0.95
+
+training:
+  lr: 3e-4
+  n_epochs: 10
+  
+  batch_size: 512
+  grad_norm: 0.5
+
+  ppo:
+    normalize_advantage: True
+    clip_range: 0.2
+    entropy_coef: 0.1
+    value_function_coef: 1.0 
+
+  output_folder: ../rl_output
+  
+  save:
+    model_name: ppo
+    save_every_n_step: 5
+    n_last_steps: 10
+    target_metric: mean_reward
+    target_op: '>'

@@ -41,7 +41,7 @@ def fix_data(data) -> tp.List[torch.Tensor]:
 def dqn_training(num_instances: int):
     device = 'cuda'
     
-    cfg = yaml.safe_load(open(Path('daft_quick_nick') / 'cfg.yaml', 'r'))
+    cfg = yaml.safe_load(open(Path('daft_quick_nick') / 'dqn_cfg.yaml', 'r'))
     replay_buffer_cfg = dict(cfg['replay_buffer'])
     min_rp_data_size = int(replay_buffer_cfg['min_buffer_size'])
     
@@ -53,7 +53,7 @@ def dqn_training(num_instances: int):
     
     action_parser = GymActionParser(model_data_provider)
     obs_builder = GymObsBuilder(model_data_provider, use_mirror=True)
-    reward_estimator = RewardEstimator(float(cfg['model']['reward_decay']))
+    reward_estimator = RewardEstimator()
     replay_buffer = ReplayBuffer()
     trainer = DqnTrainer(cfg, replay_buffer, device)
         

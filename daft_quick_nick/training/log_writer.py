@@ -17,6 +17,12 @@ import plotly.graph_objects as go
 # import wandb
 
 
+def equals_paths(path_a: tp.Union[Path, str], path_b: tp.Union[Path, str]) -> bool:
+    path_a = str(Path(path_a).absolute())
+    path_b = str(Path(path_b).absolute())
+    return path_a == path_b
+
+
 def get_run_name(train_tag: tp.Optional[str] = None) -> str:
     d_now = datetime.now()
     if train_tag is None:
@@ -215,7 +221,7 @@ class LogWriter:
             return
         model_name = str(self.save_cfg.get('model_name', 'model'))
         cfg_target_metric = self.save_cfg.get('target_metric', None)
-        if self.last_values is not None and cfg_target_metric is  not None:
+        if self.last_values is not None and cfg_target_metric is not None:
             target_op = {
                 '<': operator.le,
                 '>': operator.ge,
@@ -251,9 +257,13 @@ class LogWriter:
         
         model_ckpt_path = self.output_weights_folder / f'{model_name}_{self.step}.kpt'
         torch.save(model.state_dict(), model_ckpt_path)
-        self.last_weights_paths.append(model_ckpt_path)
+        assert model_ckpt_path.exists()
+        if len(self.last_weights_paths) > 0 and equals_paths(model_ckpt_path, self.last_weights_paths[-1]):
+            logging.warning(f'It looks like you are saving the model weights several times!')
+        else:
+            self.last_weights_paths.append(model_ckpt_path)
         if len(self.last_weights_paths) > n_last_steps:
-            del_paths = self.last_weights_paths[:len(self.last_weights_paths) - n_last_steps]
+            del_paths = self.last_weights_paths[:-n_last_steps]
             for model_ckpt_path in del_paths:
                 os.remove(model_ckpt_path)
             self.last_weights_paths = self.last_weights_paths[-n_last_steps:]
@@ -261,10 +271,15 @@ class LogWriter:
         if optimizator is not None:
             opt_ckpt_path = self.output_weights_folder / f'opt_{model_name}_{self.step}.kpt'
             torch.save(optimizator.state_dict(), opt_ckpt_path)
-            self.last_optimizer_paths.append(opt_ckpt_path)
+            assert opt_ckpt_path.exists()
+            
+            if len(self.last_optimizer_paths) > 0 and equals_paths(opt_ckpt_path, self.last_optimizer_paths[-1]):
+                logging.warning(f'It looks like you are saving the optimizer several times!')
+            else:
+                self.last_optimizer_paths.append(opt_ckpt_path)
             
             if len(self.last_optimizer_paths) > n_last_steps:
-                del_paths = self.last_optimizer_paths[:len(self.last_optimizer_paths) - n_last_steps]
+                del_paths = self.last_optimizer_paths[:-n_last_steps]
                 for opt_ckpt_path in del_paths:
                     os.remove(opt_ckpt_path)
                 self.last_optimizer_paths = self.last_optimizer_paths[-n_last_steps:]
@@ -279,12 +294,17 @@ class LogWriter:
         if ext_name is None:
             ext_name = ''
         
-        opt_ckpt_path = self.output_weights_folder / f'opt_{model_name}_{self.step}{ext_name}.kpt'
+        opt_ckpt_path = self.output_weights_folder / f'opt_{model_name}_{self.step}.kpt'
         torch.save(optimizator.state_dict(), opt_ckpt_path)
-        self.last_optimizer_paths.append(opt_ckpt_path)
+        assert opt_ckpt_path.exists()
+        
+        if len(self.last_optimizer_paths) > 0 and equals_paths(opt_ckpt_path, self.last_optimizer_paths[-1]):
+            logging.warning(f'It looks like you are saving the optimizer several times!')
+        else:
+            self.last_optimizer_paths.append(opt_ckpt_path)
         
         if len(self.last_optimizer_paths) > n_last_steps:
-            del_paths = self.last_optimizer_paths[:len(self.last_optimizer_paths) - n_last_steps]
+            del_paths = self.last_optimizer_paths[:-n_last_steps]
             for opt_ckpt_path in del_paths:
                 os.remove(opt_ckpt_path)
             self.last_optimizer_paths = self.last_optimizer_paths[-n_last_steps:]

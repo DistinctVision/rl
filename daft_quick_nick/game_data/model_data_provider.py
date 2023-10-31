@@ -13,31 +13,31 @@ class DataScaler:
         self.angle_std = angle_std
         
     def scale(self, world_state: WorldState, copy: bool = True) -> WorldState:
-        # if copy:
-        #     world_state = deepcopy(world_state)
-        # world_state.ball.location = world_state.ball.location / self.pos_std
-        # world_state.ball.velocity = world_state.ball.velocity / self.pos_std
-        # world_state.ball.angular_velocity /= self.angle_std
-        # for team_players in world_state.players:
-        #     for player_info in team_players:
-        #         player_info.location = player_info.location / self.pos_std
-        #         player_info.velocity = player_info.velocity / self.pos_std
-        #         player_info.boost /= 100
-        #         player_info.angular_velocity /= self.angle_std
+        if copy:
+            world_state = deepcopy(world_state)
+        world_state.ball.location = world_state.ball.location / self.pos_std
+        world_state.ball.velocity = world_state.ball.velocity / self.pos_std
+        world_state.ball.angular_velocity /= self.angle_std
+        for team_players in world_state.players:
+            for player_info in team_players:
+                player_info.location = player_info.location / self.pos_std
+                player_info.velocity = player_info.velocity / self.pos_std
+                player_info.boost /= 100
+                player_info.angular_velocity /= self.angle_std
         return world_state
         
     def unscale(self, world_state: WorldState, copy: bool = True) -> WorldState:
-        # if copy:
-        #     world_state = deepcopy(world_state)
-        # world_state.ball.location = world_state.ball.location * self.pos_std
-        # world_state.ball.velocity = world_state.ball.velocity * self.pos_std
-        # world_state.ball.angular_velocity *= self.angle_std
-        # for team_players in world_state.players:
-        #     for player_info in team_players:
-        #         player_info.location = player_info.location * self.pos_std
-        #         player_info.velocity = player_info.velocity * self.pos_std
-        #         player_info.boost *= 100
-        #         player_info.angular_velocity *= self.angle_std
+        if copy:
+            world_state = deepcopy(world_state)
+        world_state.ball.location = world_state.ball.location * self.pos_std
+        world_state.ball.velocity = world_state.ball.velocity * self.pos_std
+        world_state.ball.angular_velocity *= self.angle_std
+        for team_players in world_state.players:
+            for player_info in team_players:
+                player_info.location = player_info.location * self.pos_std
+                player_info.velocity = player_info.velocity * self.pos_std
+                player_info.boost *= 100
+                player_info.angular_velocity *= self.angle_std
         return world_state
 
 

@@ -9,9 +9,8 @@ from daft_quick_nick.utils.constans import CAR_MAX_SPEED, BALL_RADIUS
 
 class RewardEstimator(RewardFunction):
     
-    def __init__(self, reward_decay: float) -> None:
+    def __init__(self) -> None:
         super().__init__()
-        self.reward_decay = reward_decay
         self.prev_distances: tp.Dict[int, float] = {}
         
     def reset(self, initial_state: GameState):
@@ -26,7 +25,7 @@ class RewardEstimator(RewardFunction):
     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
         
         dis = np.linalg.norm(player.car_data.position - state.ball.position)
-        delta_dis = self.prev_distances[player.car_id]  - dis
+        delta_dis = self.prev_distances[player.car_id] - dis
         self.prev_distances[player.car_id] = dis
         
         return delta_dis / BALL_RADIUS
