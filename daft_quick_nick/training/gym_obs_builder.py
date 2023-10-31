@@ -65,23 +65,23 @@ class GymObsBuilder(ObsBuilder):
                                 rotation=EulerAngles.from_array(agent_obj.euler_angles()),
                                 velocity=Vec3.from_array(agent_obj.linear_velocity),
                                 angular_velocity=Vec3.from_array(agent_obj.angular_velocity),
-                                boost=agent.boost_amount,
+                                boost=int(agent.boost_amount * 100),
                                 is_demolished=agent.is_demoed,
                                 has_wheel_contact=agent.on_ground,
-                                is_super_sonic=True,
-                                jumped=agent.has_jump,
-                                double_jumped=agent.has_flip)
+                                is_super_sonic=False,
+                                jumped=not agent.has_jump,
+                                double_jumped=not agent.has_flip)
         
         enemy_info = PlayerInfo(location=Vec3.from_array(enemy_obj.position),
                                 rotation=EulerAngles.from_array(enemy_obj.euler_angles()),
                                 velocity=Vec3.from_array(enemy_obj.linear_velocity),
                                 angular_velocity=Vec3.from_array(enemy_obj.angular_velocity),
-                                boost=enemy.boost_amount,
+                                boost=int(enemy.boost_amount * 100),
                                 is_demolished=enemy.is_demoed,
                                 has_wheel_contact=enemy.on_ground,
-                                is_super_sonic=True,
-                                jumped=enemy.has_jump,
-                                double_jumped=enemy.has_flip)
+                                is_super_sonic=False,
+                                jumped=not enemy.has_jump,
+                                double_jumped=not enemy.has_flip)
         
         world_state = WorldState(ball=ball_info, players=[[agent_info], [enemy_info]], boosts=boost_pads)
         

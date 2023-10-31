@@ -23,12 +23,16 @@ class RewardEstimator(RewardFunction):
         ...
 
     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
-        
+
         dis = np.linalg.norm(player.car_data.position - state.ball.position)
+        
         delta_dis = self.prev_distances[player.car_id] - dis
         self.prev_distances[player.car_id] = dis
         
-        return delta_dis / BALL_RADIUS
+        score = delta_dis / BALL_RADIUS
+        if player.ball_touched:
+            score += 10.0
+        return score
 
     def get_final_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
         return self.get_reward(player, state, previous_action)

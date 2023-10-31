@@ -2,10 +2,12 @@ import typing as tp
 import itertools
 from pathlib import Path
 from dataclasses import dataclass
+
 import random
 import logging
 
 import yaml
+import numpy as np
 import torch
 import einops
 
@@ -15,6 +17,10 @@ from rlbot.utils.structures.game_data_struct import GameTickPacket
 from daft_quick_nick.utils import Vec3, EulerAngles
 from daft_quick_nick.game_data import WorldState, ModelDataProvider
 from daft_quick_nick.actor_critic_policy import ActorCriticPolicy
+
+from rlgym_compat import GameState
+from rlgym.utils.gamestates import PlayerData, PhysicsObject
+from daft_quick_nick.game_data import BallInfo, EulerAngles, Vec3, PlayerInfo
 
 
 
@@ -46,6 +52,43 @@ class DaftQuickNick(BaseAgent):
         
     def initialize_agent(self):
         ...
+        self.field_info = self.get_field_info()
+        self.game_state = GameState(self.field_info)
+    
+    def _build_world_state(self, agent: PlayerData, agent_obj: PhysicsObject,
+                           enemy: PlayerData, enemy_obj: PhysicsObject,
+                           ball_obj: PhysicsObject, boost_pads: np.ndarray) -> WorldState:
+        
+        ball_info = BallInfo(location=Vec3.from_array(ball_obj.position),
+                             rotation=EulerAngles.from_array(ball_obj.euler_angles()),
+                             velocity=Vec3.from_array(ball_obj.linear_velocity),
+                             angular_velocity=Vec3.from_array(ball_obj.angular_velocity))
+        
+        agent_info = PlayerInfo(location=Vec3.from_array(agent_obj.position),
+                                rotation=EulerAngles.from_array(agent_obj.euler_angles()),
+                                velocity=Vec3.from_array(agent_obj.linear_velocity),
+                                angular_velocity=Vec3.from_array(agent_obj.angular_velocity),
+                                boost=agent.boost_amount,
+                                is_demolished=agent.is_demoed,
+                                has_wheel_contact=agent.on_ground,
+                                is_super_sonic=True,
+                                jumped=agent.has_jump,
+                                double_jumped=agent.has_flip)
+        
+        enemy_info = PlayerInfo(location=Vec3.from_array(enemy_obj.position),
+                                rotation=EulerAngles.from_array(enemy_obj.euler_angles()),
+                                velocity=Vec3.from_array(enemy_obj.linear_velocity),
+                                angular_velocity=Vec3.from_array(enemy_obj.angular_velocity),
+                                boost=enemy.boost_amount,
+                                is_demolished=enemy.is_demoed,
+                                has_wheel_contact=enemy.on_ground,
+                                is_super_sonic=True,
+                                jumped=enemy.has_jump,
+                                double_jumped=enemy.has_flip)
+        
+        world_state = WorldState(ball=ball_info, players=[[agent_info], [enemy_info]], boosts=boost_pads)
+        
+        return world_state
                 
     def get_output(self, packet: GameTickPacket) -> SimpleControllerState:
         if not packet.game_info.is_round_active:
@@ -61,9 +104,14 @@ class DaftQuickNick(BaseAgent):
                 self.logger.warning(f'Too slow processing: {delta_time:.2f}s')
             elif delta_time < frame_time * 0.75:
                 return self.last_controls
+            
+        self.game_state.decode(packet)
+        agent: PlayerData = self.game_state.players[self.team]
+        player: PlayerData = self.game_state.players[1 - self.team]
+        world_state_1 = self._build_world_state(agent, agent.car_data, player, player.car_data, self.game_state.ball, self.game_state.boost_pads)
         
         world_state = WorldState.from_game_packet(packet)
-        world_states_tensor = self.data_provider.world_state_to_tensor(world_state, self.team, self.device)
+        world_states_tensor = self.data_provider.world_state_to_tensor(world_state_1, self.team, self.device)
         
         with torch.no_grad():
             logits: torch.Tensor = self.policy_net(world_states_tensor.unsqueeze(0))

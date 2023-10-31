@@ -69,11 +69,11 @@ def ppo_training(num_of_env_instances: int):
             obs_builder=obs_builder,
             state_setter=NectoStateSetter(),
             action_parser=action_parser,
-            game_speed=100, tick_skip=12, spawn_opponents=True, team_size=1
+            game_speed=1, tick_skip=12, spawn_opponents=True, team_size=1
         )
 
     env = SB3MultipleInstanceEnv(match_func_or_matches=get_match,
-                                 num_instances=num_of_env_instances, wait_time=20)
+                                 num_instances=num_of_env_instances, wait_time=30)
 
     last_rewards = deque(maxlen=50)
     ep_counter = 0
