@@ -3,14 +3,13 @@ import typing as tp
 from pathlib import Path
 import logging
 import yaml
-import math
 
 import numpy as np
 import torch
 from tqdm import tqdm
 
 from daft_quick_nick.training.log_writer import LogWriter, get_run_name, make_output_folder
-from daft_quick_nick.model import get_model_num_params
+from daft_quick_nick.model import get_model_num_params, ModelDataProvider
 from daft_quick_nick.actor_critic_policy import ActorCriticPolicy
 from daft_quick_nick.training.rollout import RolloutDataset
 
@@ -45,7 +44,6 @@ class PpoTrainer:
         self.logger = logging.getLogger(__name__)
         self.device = torch.device(device)
 
-        self.action_set = [action_idx for action_idx in range(int(self.cfg['model']['out_size']))]
         self.models: tp.Optional[ActorCriticPolicy] = None
         self.optimizer: tp.Optional[torch.optim.Optimizer] = None
 
@@ -82,7 +80,8 @@ class PpoTrainer:
         model_cfg = dict(self.cfg['model'])
         training_cfg = dict(self.cfg['training'])
         
-        self.models = ActorCriticPolicy.build(model_cfg)
+        data_provider = ModelDataProvider()
+        self.models = ActorCriticPolicy.build(model_cfg, data_provider)
         
         if 'models_path' in model_cfg:
             ckpt = torch.load(str(model_cfg['models_path']), map_location='cpu')
@@ -137,7 +136,7 @@ class PpoTrainer:
                 
                 batch.to_device(self.device)
 
-                new_values, new_log_probs, new_entropy = self.models.evaluate_actions(batch.observations, batch.actions)
+                new_values, new_log_probs, new_entropy = self.models.evaluate_actions(batch.states, batch.actions)
 
                 advantages = batch.advantages
                 if normalize_advantage and len(advantages) > 1:

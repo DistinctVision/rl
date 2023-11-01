@@ -46,6 +46,7 @@ def ppo_training(num_of_env_instances: int):
     cfg = yaml.safe_load(open(Path('daft_quick_nick') / 'ppo_cfg.yaml', 'r'))
     rollout_cfg = dict(cfg['rollout'])
     batch_size = int(cfg['training']['batch_size'])
+    sequence_size = int(cfg['model']['sequence_size'])
     rollout_max_buffer_size = int(rollout_cfg['max_buffer_size'])
     target_data_size = rollout_max_buffer_size
     rollout_max_buffer_size = math.ceil(rollout_max_buffer_size / num_of_env_instances)
@@ -79,7 +80,7 @@ def ppo_training(num_of_env_instances: int):
     ep_counter = 0
     
     while True:
-        cur_rollout_buffers = [RolloutBuffer(rollout_cfg, actor_critic_policy.value_net)
+        cur_rollout_buffers = [RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size)
                                for _ in range(num_of_env_instances * num_cars)]
         for cur_rollout_buffer in cur_rollout_buffers:
             cur_rollout_buffer.start()
@@ -92,8 +93,8 @@ def ppo_training(num_of_env_instances: int):
         ep_rewards = np.zeros((num_of_env_instances * num_cars), dtype=float)
         
         while not dones.all():
-            action_dists = [actor_critic_policy.get_action_dist(obs_tensor)
-                            for obs_tensor in obs]
+            action_dists = [actor_critic_policy.get_action_dist(cur_rollout_buffer.new_state(obs_tensor))
+                            for cur_rollout_buffer, obs_tensor in zip(cur_rollout_buffers, obs)]
             actions = [int(action_dict.sample()) for action_dict in action_dists]
             env.step_async(actions)
             next_obs, rewards, next_dones, gameinfo = env.step_wait()
@@ -143,7 +144,8 @@ def ppo_training(num_of_env_instances: int):
             f'Episode Rewards: {ep_rewards_str}')
         
         while data_size >= target_data_size:
-            dataset, rollout_buffers = RolloutDataset.collect_data(target_data_size, batch_size, rollout_buffers)
+            dataset, rollout_buffers = RolloutDataset.collect_data(target_data_size, batch_size, sequence_size,
+                                                                   rollout_buffers)
             trainer.train(dataset)
             data_size = sum([len(rollout_buffer) for rollout_buffer in rollout_buffers])
     

@@ -2,6 +2,8 @@ import typing as tp
 
 import torch
 
+from daft_quick_nick.game_data import ModelDataProvider
+
 
 def build_mlp_net(in_size: int, out_size: int,
                   layers: tp.List[int], dropout: float) -> torch.nn.Module:
@@ -69,11 +71,16 @@ def init_weights(model: torch.nn.Module):
 class ActorCriticPolicy(torch.nn.Module):
     
     @staticmethod
-    def build(model_cfg: tp.Dict[str, tp.Union[int, float, tp.List[int]]]) -> 'ActorCriticPolicy':
+    def build(model_cfg: tp.Dict[str, tp.Union[int, float, tp.List[int]]],
+              model_data_provider: ModelDataProvider) -> 'ActorCriticPolicy':
+        sequence_size =  int(model_cfg['sequence_size'])
+        in_size = model_data_provider.WORLD_STATE_SIZE * sequence_size
+        out_size = model_data_provider.num_actions
+        
         policy_net_layers = [int(layer) for layer in list(model_cfg['policy_net_layers'])]
         value_net_layers = [int(layer) for layer in list(model_cfg['value_net_layers'])]
-        return ActorCriticPolicy(in_size=int(model_cfg['in_size']),
-                                 out_size=int(model_cfg['out_size']),
+        return ActorCriticPolicy(in_size=in_size,
+                                 out_size=out_size,
                                  policy_net_layers=policy_net_layers,
                                  value_net_layers=value_net_layers,
                                  dropout=float(model_cfg['dropout']))
@@ -101,31 +108,31 @@ class ActorCriticPolicy(torch.nn.Module):
         init_weights(self.policy_net)
         init_weights(self.value_net)
     
-    def get_action_dist(self, observation: torch.Tensor) -> torch.distributions.Categorical:
-        device = observation.device
-        logits = self.policy_net(observation.to(self.device)).to(device)
+    def get_action_dist(self, state: torch.Tensor) -> torch.distributions.Categorical:
+        device = state.device
+        logits = self.policy_net(state.to(self.device)).to(device)
         action_prob = torch.nn.functional.softmax(logits, dim=-1)
         return torch.distributions.Categorical(action_prob)
     
     def evaluate_actions(self,
-                         observations: torch.Tensor,
+                         states: torch.Tensor,
                          actions: torch.Tensor) -> tp.Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Evaluate actions according to the current policy, given the observations.
 
         Args:
-            observations: Observations
+            states: States
             actions: Actions
             
         Returns:
             Estimated value, log likelihood of taking those actions and entropy of the action distribution.
         """
         
-        logits = self.policy_net(observations)
+        logits = self.policy_net(states)
         action_prob = torch.nn.functional.softmax(logits, dim=-1)
         action_dist = torch.distributions.Categorical(action_prob)
         action_log_prob = action_dist.log_prob(actions)
-        values = self.value_net(observations)
+        values: torch.Tensor = self.value_net(states)
         values = values.squeeze(1)
         return values, action_log_prob, action_dist.entropy()
     
