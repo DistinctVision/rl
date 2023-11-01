@@ -115,8 +115,9 @@ class DaftQuickNick(BaseAgent):
         
         with torch.no_grad():
             logits: torch.Tensor = self.policy_net(world_states_tensor.unsqueeze(0))
-            logits.squeeze_(1)
-            action_idx = int(logits.argmax())
+            probs =  torch.nn.functional.softmax(logits.squeeze(0).cpu())
+            action_dist  = torch.distributions.Categorical(probs)
+            action_idx = int(action_dist.sample())
         
         action = self.data_provider.action_lookup_table[action_idx, :].tolist()
         [throttle, steer, pitch, yaw, roll, jump, boost, handbrake] = action

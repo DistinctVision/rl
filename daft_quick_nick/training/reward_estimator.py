@@ -31,7 +31,7 @@ class RewardEstimator(RewardFunction):
         
         score = delta_dis / BALL_RADIUS
         if player.ball_touched:
-            score += 10.0
+            score += 100.0
         return score
 
     def get_final_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
