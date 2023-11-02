@@ -11,6 +11,11 @@ model:
 game:
   fps: 10
 
+replays:
+  data_folder: '..\rl_replays'
+  max_readed_games: 5
+  reread_games_every_n_step: 10000
+
 rollout:
   observation_size: 43
   max_buffer_size: 16384

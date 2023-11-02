@@ -1,3 +1,5 @@
+import typing as tp
+
 import numpy as np
 
 from rlgym.utils import StateSetter
@@ -9,9 +11,10 @@ from rlgym.utils.state_setters import DefaultState, StateWrapper
 
 from rlgym_tools.extra_state_setters.goalie_state import GoaliePracticeState
 from rlgym_tools.extra_state_setters.hoops_setter import HoopsLikeSetter
-from rlgym_tools.extra_state_setters.replay_setter import ReplaySetter
 from rlgym_tools.extra_state_setters.symmetric_setter import KickoffLikeSetter
 from rlgym_tools.extra_state_setters.wall_state import WallPracticeState
+
+from .random_replay_state_setter import RandomReplayStateSetter
 
 
 LIM_X = SIDE_WALL_X - 1152 / 2 - BALL_RADIUS * 2 ** 0.5
@@ -83,18 +86,20 @@ class BetterRandom(StateSetter):  # Random state with some triangular distributi
             car.boost = np.random.uniform(0, 1)
 
 
-class NectoStateSetter(StateSetter):
-    def __init__(
-            self, *,
-            random_prob=0.26666667,
-            kickoff_prob=0.13333333,
-            kickofflike_prob=0.13333333,
-            goalie_prob=0.16666667,
-            hoops_prob=0.13333333,
-            wall_prob=0.16666667
-    ):  # add goalie_prob/shooting/dribbling?
+class GeneralStateSetter(StateSetter):
+    
+    def __init__(self,
+                 replays_cfg: tp.Dict[str, tp.Union[str, float, int]], *,
+                 replay_prob: float = 0.7,
+                 random_prob: float = 0.08,
+                 kickoff_prob: float = 0.04,
+                 kickofflike_prob: float = 0.04,
+                 goalie_prob: float = 0.05,
+                 hoops_prob: float = 0.04,
+                 wall_prob: float = 0.05):
         super().__init__()
         self.setters = [
+            RandomReplayStateSetter(replays_cfg),
             BetterRandom(),
             DefaultState(),
             KickoffLikeSetter(),
@@ -103,7 +108,7 @@ class NectoStateSetter(StateSetter):
             WallPracticeState()
         ]
         self.probs = np.array(
-            [random_prob, kickoff_prob, kickofflike_prob, goalie_prob, hoops_prob, wall_prob])
+            [replay_prob, random_prob, kickoff_prob, kickofflike_prob, goalie_prob, hoops_prob, wall_prob])
         assert self.probs.sum() == 1, "Probabilities must sum to 1"
 
     # def build_wrapper(self, max_team_size: int, spawn_opponents: bool) -> StateWrapper:

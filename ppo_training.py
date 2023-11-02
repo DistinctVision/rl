@@ -14,9 +14,8 @@ from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 from ppocket_rocket.game_data import ModelDataProvider
 from ppocket_rocket.training.ppo_trainer import PpoTrainer
 from ppocket_rocket.training.rollout import RolloutBuffer, RolloutDataset
-from ppocket_rocket.actor_critic_policy import ActorCriticPolicy
 from ppocket_rocket.training import GymActionParser, GymObsBuilder, RewardEstimator
-from ppocket_rocket.training.state_setter import NectoStateSetter
+from ppocket_rocket.training.state_setter import GeneralStateSetter
 
 
 def fix_data(data) -> tp.List[torch.Tensor]:
@@ -68,7 +67,7 @@ def ppo_training(num_of_env_instances: int):
             reward_function=reward_estimator,
             terminal_conditions=[TimeoutCondition(60 * 10), GoalScoredCondition()],
             obs_builder=obs_builder,
-            state_setter=NectoStateSetter(),
+            state_setter=GeneralStateSetter(dict(cfg['replays'])),
             action_parser=action_parser,
             game_speed=100, tick_skip=12, spawn_opponents=True, team_size=1
         )
