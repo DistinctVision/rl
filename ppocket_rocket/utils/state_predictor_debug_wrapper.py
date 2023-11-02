@@ -10,8 +10,8 @@ import torch
 from rlbot.agents.base_agent import BaseAgent, SimpleControllerState
 from rlbot.utils.structures.game_data_struct import GameTickPacket
 
-from daft_quick_nick.game_data import WorldState, ActionState, ModelDataProvider
-from daft_quick_nick.state_predictor import StatePredictorModel
+from ppocket_rocket.game_data import WorldState, ActionState, ModelDataProvider
+from ppocket_rocket.state_predictor import StatePredictorModel
 
 
 AgentType = tp.TypeVar('AgentType', bound=BaseAgent, covariant=True)

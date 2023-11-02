@@ -3,8 +3,8 @@ import typing as tp
 import numpy as np
 import torch
 
-from daft_quick_nick.training.replay_buffer import ReplayBuffer
-from daft_quick_nick.training.rp_data_types import RP_SeqOfRecords
+from ppocket_rocket.training.replay_buffer import ReplayBuffer
+from ppocket_rocket.training.rp_data_types import RP_SeqOfRecords
         
 
 class StatePredictorEpisodeDataRecorder:

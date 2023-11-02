@@ -1,5 +1,5 @@
 from pathlib import Path
-from daft_quick_nick.utils.state_predictor_debug_wrapper import StatePredictorDebugWrapper
+from ppocket_rocket.utils.state_predictor_debug_wrapper import StatePredictorDebugWrapper
 from Nexto.bot import Nexto
 
 

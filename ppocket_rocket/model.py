@@ -2,8 +2,8 @@ import typing as tp
 import functools
 import torch
 
-from daft_quick_nick.game_data import ModelDataProvider
-from daft_quick_nick.state_predictor import RnnCoreModel, StatePredictorModel
+from ppocket_rocket.game_data import ModelDataProvider
+from ppocket_rocket.state_predictor import RnnCoreModel, StatePredictorModel
 
 
 def get_model_num_params(model: torch.nn.Module) -> str:

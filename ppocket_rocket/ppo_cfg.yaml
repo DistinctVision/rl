@@ -1,5 +1,5 @@
 model:
-  sequence_size: 2
+  sequence_size: 1
 
   policy_net_layers: [256, 128]
   value_net_layers: [256, 128]

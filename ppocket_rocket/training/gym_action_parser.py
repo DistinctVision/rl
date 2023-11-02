@@ -7,7 +7,7 @@ from rlgym.utils.gamestates import GameState
 from rlgym.utils import ActionParser
 from rlgym.utils import common_values
 
-from daft_quick_nick.game_data import ModelDataProvider
+from ppocket_rocket.game_data import ModelDataProvider
 
 
 class GymActionParser(ActionParser):

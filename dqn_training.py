@@ -10,11 +10,11 @@ from rlgym.envs import Match
 from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
 from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 
-from daft_quick_nick.state_predictor import StatePredictorModel
-from daft_quick_nick.game_data import ModelDataProvider
-from daft_quick_nick.training import DqnTrainer, ReplayBuffer, DqnEpisodeDataRecorder
-from daft_quick_nick.training import GymActionParser, GymObsBuilder, RewardEstimator
-from daft_quick_nick.training import RandomBallGameState
+from ppocket_rocket.state_predictor import StatePredictorModel
+from ppocket_rocket.game_data import ModelDataProvider
+from ppocket_rocket.training import DqnTrainer, ReplayBuffer, DqnEpisodeDataRecorder
+from ppocket_rocket.training import GymActionParser, GymObsBuilder, RewardEstimator
+from ppocket_rocket.training import RandomBallGameState
 
 
 def fix_data(data) -> tp.List[torch.Tensor]:
@@ -41,7 +41,7 @@ def fix_data(data) -> tp.List[torch.Tensor]:
 def dqn_training(num_instances: int):
     device = 'cuda'
     
-    cfg = yaml.safe_load(open(Path('daft_quick_nick') / 'dqn_cfg.yaml', 'r'))
+    cfg = yaml.safe_load(open(Path('ppocket_rocket') / 'dqn_cfg.yaml', 'r'))
     replay_buffer_cfg = dict(cfg['replay_buffer'])
     min_rp_data_size = int(replay_buffer_cfg['min_buffer_size'])
     

@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 import torch
 
-from daft_quick_nick.training.rp_data_types import RP_Record, RP_RecordArray, RP_SeqOfRecords
+from ppocket_rocket.training.rp_data_types import RP_Record, RP_RecordArray, RP_SeqOfRecords
 
 
 class ReplayBuffer:

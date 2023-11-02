@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from rlbot.utils.structures.game_data_struct import GameTickPacket
 from rlbot.agents.base_agent import SimpleControllerState
-from daft_quick_nick.utils import Vec3, EulerAngles
+from ppocket_rocket.utils import Vec3, EulerAngles
 
 
 @dataclass

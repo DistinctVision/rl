@@ -11,12 +11,12 @@ from rlgym.envs import Match
 from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
 from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 
-from daft_quick_nick.game_data import ModelDataProvider
-from daft_quick_nick.training.ppo_trainer import PpoTrainer
-from daft_quick_nick.training.rollout import RolloutBuffer, RolloutDataset
-from daft_quick_nick.actor_critic_policy import ActorCriticPolicy
-from daft_quick_nick.training import GymActionParser, GymObsBuilder, RewardEstimator
-from daft_quick_nick.training.state_setter import NectoStateSetter
+from ppocket_rocket.game_data import ModelDataProvider
+from ppocket_rocket.training.ppo_trainer import PpoTrainer
+from ppocket_rocket.training.rollout import RolloutBuffer, RolloutDataset
+from ppocket_rocket.actor_critic_policy import ActorCriticPolicy
+from ppocket_rocket.training import GymActionParser, GymObsBuilder, RewardEstimator
+from ppocket_rocket.training.state_setter import NectoStateSetter
 
 
 def fix_data(data) -> tp.List[torch.Tensor]:
@@ -43,7 +43,7 @@ def fix_data(data) -> tp.List[torch.Tensor]:
 def ppo_training(num_of_env_instances: int):
     device = 'cuda'
     
-    cfg = yaml.safe_load(open(Path('daft_quick_nick') / 'ppo_cfg.yaml', 'r'))
+    cfg = yaml.safe_load(open(Path('ppocket_rocket') / 'ppo_cfg.yaml', 'r'))
     rollout_cfg = dict(cfg['rollout'])
     batch_size = int(cfg['training']['batch_size'])
     sequence_size = int(cfg['model']['sequence_size'])

@@ -2,7 +2,7 @@ import typing as tp
 
 import torch
 
-from daft_quick_nick.game_data import ModelDataProvider
+from ppocket_rocket.game_data import ModelDataProvider
 
 
 def build_mlp_net(in_size: int, out_size: int,

@@ -10,13 +10,13 @@ from rlgym.utils.reward_functions import DefaultReward
 from rlgym.utils.terminal_conditions.common_conditions import TimeoutCondition, GoalScoredCondition
 from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 
-from daft_quick_nick.game_data import ModelDataProvider
-from daft_quick_nick.training import StatePredictorTrainer, ReplayBuffer, StatePredictorEpisodeDataRecorder
-from daft_quick_nick.training import GymActionParser
-from daft_quick_nick.training import RandomBallGameState
+from ppocket_rocket.game_data import ModelDataProvider
+from ppocket_rocket.training import StatePredictorTrainer, ReplayBuffer, StatePredictorEpisodeDataRecorder
+from ppocket_rocket.training import GymActionParser
+from ppocket_rocket.training import RandomBallGameState
 from Nexto.ext_nexto_obs_builder import ExtNextoObsBuilder, ExtNextoObsData
 from Nexto.agent import Agent as NextoAgent
-from daft_quick_nick.training.state_setter import NectoStateSetter
+from ppocket_rocket.training.state_setter import NectoStateSetter
 
 
 def fix_data(data) -> tp.List[ExtNextoObsData]:
@@ -41,7 +41,7 @@ def fix_data(data) -> tp.List[ExtNextoObsData]:
 
 
 def state_predictor_training(num_instances: int):
-    cfg = yaml.safe_load(open(Path('daft_quick_nick') / 'cfg.yaml', 'r'))
+    cfg = yaml.safe_load(open(Path('ppocket_rocket') / 'cfg.yaml', 'r'))
     training_cfg = dict(cfg['state_predictor_training'])
     train_min_data_size = int(training_cfg['train_size']['min'])
     val_min_data_size = int(training_cfg['val_size']['min'])

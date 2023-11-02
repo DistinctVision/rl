@@ -14,8 +14,8 @@ model:
   dropout: 0.0
   reward_decay: 0.99
 
-  _critic_model_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/best_daft_quick_nick.kpt'
-  _critic_optimizer_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/opt_daft_quick_nick_500.kpt'
+  _critic_model_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/best_ppocket_rocket.kpt'
+  _critic_optimizer_path: '../rl_output/dqn_10_22_2023__20_13_43/weights/opt_ppocket_rocket_500.kpt'
 
 game:
   fps: 10
@@ -44,7 +44,7 @@ training:
   output_folder: ../rl_output
   
   save:
-    model_name: daft_quick_nick
+    model_name: ppocket_rocket
     save_every_n_step: 10
     n_last_steps: 100
     target_metric: reward

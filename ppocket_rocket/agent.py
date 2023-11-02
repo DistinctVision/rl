@@ -14,13 +14,13 @@ import einops
 from rlbot.agents.base_agent import BaseAgent, SimpleControllerState
 from rlbot.utils.structures.game_data_struct import GameTickPacket
 
-from daft_quick_nick.utils import Vec3, EulerAngles
-from daft_quick_nick.game_data import WorldState, ModelDataProvider
-from daft_quick_nick.actor_critic_policy import ActorCriticPolicy
+from ppocket_rocket.utils import Vec3, EulerAngles
+from ppocket_rocket.game_data import WorldState, ModelDataProvider
+from ppocket_rocket.actor_critic_policy import ActorCriticPolicy
 
 from rlgym_compat import GameState
 from rlgym.utils.gamestates import PlayerData, PhysicsObject
-from daft_quick_nick.game_data import BallInfo, EulerAngles, Vec3, PlayerInfo
+from ppocket_rocket.game_data import BallInfo, EulerAngles, Vec3, PlayerInfo
 
 
 

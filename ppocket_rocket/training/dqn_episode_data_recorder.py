@@ -2,9 +2,9 @@ import typing as tp
 import numpy as np
 import torch
 
-from daft_quick_nick.training.dqn_trainer import DqnTrainer
-from daft_quick_nick.training.rp_data_types import RP_SeqOfRecords
-from daft_quick_nick.state_predictor import RnnCoreModel
+from ppocket_rocket.training.dqn_trainer import DqnTrainer
+from ppocket_rocket.training.rp_data_types import RP_SeqOfRecords
+from ppocket_rocket.state_predictor import RnnCoreModel
         
 
 class DqnEpisodeDataRecorder:

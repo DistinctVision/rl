@@ -8,10 +8,10 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from daft_quick_nick.training.log_writer import LogWriter, get_run_name, make_output_folder
-from daft_quick_nick.model import get_model_num_params, ModelDataProvider
-from daft_quick_nick.actor_critic_policy import ActorCriticPolicy
-from daft_quick_nick.training.rollout import RolloutDataset
+from ppocket_rocket.training.log_writer import LogWriter, get_run_name, make_output_folder
+from ppocket_rocket.model import get_model_num_params, ModelDataProvider
+from ppocket_rocket.actor_critic_policy import ActorCriticPolicy
+from ppocket_rocket.training.rollout import RolloutDataset
 
 
             

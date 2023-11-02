@@ -7,7 +7,7 @@ import torch
 from rlgym.utils.obs_builders import ObsBuilder
 from rlgym.utils.gamestates import PlayerData, GameState, PhysicsObject
 
-from daft_quick_nick.game_data import WorldState, BallInfo, EulerAngles, Vec3, PlayerInfo, ModelDataProvider
+from ppocket_rocket.game_data import WorldState, BallInfo, EulerAngles, Vec3, PlayerInfo, ModelDataProvider
 
 
 class GymObsBuilder(ObsBuilder):

@@ -5,8 +5,8 @@ import math
 import torch
 import einops
 
-from daft_quick_nick.game_data import ModelDataProvider, WorldState, ActionState
-from daft_quick_nick.utils.constans import BALL_RADIUS
+from ppocket_rocket.game_data import ModelDataProvider, WorldState, ActionState
+from ppocket_rocket.utils.constans import BALL_RADIUS
 
 
 class RnnCoreModel(torch.nn.Module):

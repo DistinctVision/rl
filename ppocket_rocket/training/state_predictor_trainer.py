@@ -10,12 +10,12 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from daft_quick_nick.training.log_writer import LogWriter, get_run_name, make_output_folder, BatchValueList
-from daft_quick_nick.training.replay_buffer import ReplayBuffer
-from daft_quick_nick.game_data import ModelDataProvider
-from daft_quick_nick.state_predictor import StatePredictorModel
-from daft_quick_nick.model import get_model_num_params
-from daft_quick_nick.training.replay_buffer_batch_sampler import ReplayBufferBatchSampler
+from ppocket_rocket.training.log_writer import LogWriter, get_run_name, make_output_folder, BatchValueList
+from ppocket_rocket.training.replay_buffer import ReplayBuffer
+from ppocket_rocket.game_data import ModelDataProvider
+from ppocket_rocket.state_predictor import StatePredictorModel
+from ppocket_rocket.model import get_model_num_params
+from ppocket_rocket.training.replay_buffer_batch_sampler import ReplayBufferBatchSampler
 
 
 class StatePredictorTrainer:

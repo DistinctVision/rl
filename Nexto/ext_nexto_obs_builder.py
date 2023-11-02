@@ -8,8 +8,8 @@ import torch
 from rlgym_compat.game_state import GameState, PlayerData
 from rlgym.utils.obs_builders import ObsBuilder
 from Nexto.nexto_obs import NextoObsBuilder
-from daft_quick_nick.game_data import ModelDataProvider
-from daft_quick_nick.training import GymObsBuilder
+from ppocket_rocket.game_data import ModelDataProvider
+from ppocket_rocket.training import GymObsBuilder
 
 
 @dataclass

@@ -10,10 +10,10 @@ from dataclasses  import dataclass
 import torch
 from tqdm import tqdm
 
-from daft_quick_nick.training.log_writer import LogWriter, get_run_name, make_output_folder, BatchValueList
-from daft_quick_nick.training.replay_buffer import ReplayBuffer
-from daft_quick_nick.game_data import ModelDataProvider
-from daft_quick_nick.model import RnnCoreModel, CriticModel, get_model_num_params
+from ppocket_rocket.training.log_writer import LogWriter, get_run_name, make_output_folder, BatchValueList
+from ppocket_rocket.training.replay_buffer import ReplayBuffer
+from ppocket_rocket.game_data import ModelDataProvider
+from ppocket_rocket.model import RnnCoreModel, CriticModel, get_model_num_params
 
 
 @dataclass

@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import torch
 
-from daft_quick_nick.game_data.data_types import Vec3, EulerAngles, BallInfo, PlayerInfo, WorldState, ActionState
+from ppocket_rocket.game_data.data_types import Vec3, EulerAngles, BallInfo, PlayerInfo, WorldState, ActionState
 
 
 class DataScaler:
