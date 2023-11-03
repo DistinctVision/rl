@@ -8,13 +8,17 @@ from rlgym.utils.obs_builders import ObsBuilder
 from rlgym.utils.gamestates import PlayerData, GameState, PhysicsObject
 
 from ppocket_rocket.game_data import WorldState, BallInfo, EulerAngles, Vec3, PlayerInfo, ModelDataProvider
+from rlgym.utils.common_values import ORANGE_TEAM
 
 
 class GymObsBuilder(ObsBuilder):
 
-    def __init__(self, model_data_provider: ModelDataProvider, use_mirror: bool = True):
+    def __init__(self, model_data_provider: ModelDataProvider,
+                 orange_mirror: bool = True,
+                 double_mirror: bool = False):
         self.model_data_provider = model_data_provider
-        self.use_mirror = use_mirror
+        self.orange_mirror = orange_mirror
+        self.double_mirror = double_mirror
 
     def get_obs_space(self) -> gym.spaces.Space:
         return gym.spaces.Box(low=-np.inf, high=np.inf,
@@ -35,13 +39,30 @@ class GymObsBuilder(ObsBuilder):
             enemy_data = p_player
         assert enemy_data is not None
         
-        world_state = self._build_world_state(player,  player.car_data,
+        if self.orange_mirror:
+            if player.team_num == ORANGE_TEAM:
+                world_state = self._build_world_state(player, player.inverted_car_data,
+                                                      enemy_data, enemy_data.inverted_car_data,
+                                                      state.inverted_ball, state.inverted_boost_pads)
+                world_state_tensor = self.model_data_provider.world_state_to_tensor(world_state=world_state,
+                                                                                    agent_team_idx=0,
+                                                                                    copy=False)
+                return world_state_tensor
+            world_state = self._build_world_state(player, player.car_data,
+                                                  enemy_data, enemy_data.car_data,
+                                                  state.ball, state.boost_pads)
+            world_state_tensor = self.model_data_provider.world_state_to_tensor(world_state=world_state,
+                                                                                agent_team_idx=0,
+                                                                                copy=False)
+            return world_state_tensor
+        
+        world_state = self._build_world_state(player, player.car_data,
                                               enemy_data, enemy_data.car_data,
-                                              state.ball,  state.boost_pads)
+                                              state.ball, state.boost_pads)
         world_state_tensor = self.model_data_provider.world_state_to_tensor(world_state=world_state,
                                                                             agent_team_idx=0,
                                                                             copy=False)
-        if not self.use_mirror:
+        if not self.double_mirror:
             return world_state_tensor
         
         world_state = self._build_world_state(player, player.inverted_car_data,

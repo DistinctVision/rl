@@ -44,3 +44,4 @@ training:
     n_last_steps: 10
     target_metric: mean_reward
     target_op: '>'
+    save_hist_every_n_step: 1

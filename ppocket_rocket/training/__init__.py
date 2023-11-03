@@ -1,7 +1,7 @@
 from .gym_action_parser import GymActionParser
 from .gym_obs_builder import GymObsBuilder
 from .dqn_trainer import DqnTrainer
-from .reward_estimator import RewardEstimator
+from .reward import GeneralReward
 from .rp_data_types import RP_Record, RP_RecordArray, RP_SeqOfRecords
 from .replay_buffer import ReplayBuffer
 from .dqn_episode_data_recorder import DqnEpisodeDataRecorder

@@ -52,7 +52,7 @@ def dqn_training(num_instances: int):
     del state_predictor
     
     action_parser = GymActionParser(model_data_provider)
-    obs_builder = GymObsBuilder(model_data_provider, use_mirror=True)
+    obs_builder = GymObsBuilder(model_data_provider, double_mirror=True)
     reward_estimator = RewardEstimator()
     replay_buffer = ReplayBuffer()
     trainer = DqnTrainer(cfg, replay_buffer, device)
