@@ -32,8 +32,10 @@ class DaftQuickNick(BaseAgent):
         cfg = yaml.safe_load(open(Path(__file__).parent / 'ppo_cfg.yaml', 'r'))
         model_cfg = cfg['model']
         game_cfg = cfg['game']
+    
+        self.data_provider = ModelDataProvider()
         
-        actor_critic_policy = ActorCriticPolicy.build(model_cfg)
+        actor_critic_policy = ActorCriticPolicy.build(model_cfg, self.data_provider)
         ckpt = torch.load(str(model_cfg['models_path']))
         actor_critic_policy.load_state_dict(ckpt)
         policy_net = actor_critic_policy.policy_net
@@ -44,8 +46,6 @@ class DaftQuickNick(BaseAgent):
         self.device = torch.device('cuda')
         self.policy_net = policy_net.to(self.device)
         self.policy_net.eval()
-    
-        self.data_provider = ModelDataProvider()
         
         self.last_time_tick: tp.Optional[float] = None
         self.last_controls = SimpleControllerState()
