@@ -66,6 +66,7 @@ def ppo_training(num_of_env_instances: int):
     training_cfg = cfg['training']
     batch_size = int(training_cfg['batch_size'])
     sequence_size = int(cfg['model']['sequence_size'])
+    discount_factor = float(cfg['rollout']['discount_factor'])
     
     rollout_max_buffer_size = int(rollout_cfg['max_buffer_size'])
     target_data_size = rollout_max_buffer_size
@@ -75,7 +76,7 @@ def ppo_training(num_of_env_instances: int):
     model_data_provider = ModelDataProvider()
     action_parser = GymActionParser(model_data_provider)
     obs_builder = GymObsBuilder(model_data_provider, orange_mirror=True)
-    general_reward = GeneralReward()
+    general_reward = GeneralReward(discount_factor=discount_factor)
     trainer = PpoTrainer(cfg, device)
     actor_critic_policy = trainer.models
     
@@ -89,7 +90,7 @@ def ppo_training(num_of_env_instances: int):
     def get_match():
         return Match(
             reward_function=general_reward,
-            terminal_conditions=[TimeoutCondition(60 * 10), GoalScoredCondition()],
+            terminal_conditions=[TimeoutCondition(30 * 10), GoalScoredCondition()],
             obs_builder=obs_builder,
             state_setter=GeneralStateSetter(dict(cfg['replays'])),
             action_parser=action_parser,
@@ -162,8 +163,16 @@ def ppo_training(num_of_env_instances: int):
         for reward in ep_rewards:
             last_rewards.append(reward)
         last_mean_reward = sum(last_rewards) / len(last_rewards)
+        
+        hist_ext_values = {}
+        for metric_name, metric_values in orange_mem_reward_values.items():
+            mean_value = sum(metric_values) / max(len(metric_values), 1)
+            hist_ext_values[f'orange_{metric_name}'] = mean_value
+        for metric_name, metric_values in blue_mem_reward_values.items():
+            mean_value = sum(metric_values) / max(len(metric_values), 1)
+            hist_ext_values[f'blue_{metric_name}'] = mean_value
     
-        trainer.set_ext_values(mean_reward=last_mean_reward)
+        trainer.set_ext_values(mean_reward=last_mean_reward, **hist_ext_values)
         
         ep_counter += 1
         
@@ -182,8 +191,8 @@ def ppo_training(num_of_env_instances: int):
             data_size = sum([len(rollout_buffer) for rollout_buffer in rollout_buffers])
             
         if ep_counter % int(training_cfg['save']['save_hist_every_n_step']) == 0:
-            save_histograms(trainer.log_writer.output_plot_folder, blue_mem_reward_values, 'blue')
-            save_histograms(trainer.log_writer.output_plot_folder, orange_mem_reward_values, 'orange')
+            save_histograms(trainer.log_writer.output_plot_folder, blue_mem_reward_values, 'hist_blue')
+            save_histograms(trainer.log_writer.output_plot_folder, orange_mem_reward_values, 'hist_orange')
     
     
 if __name__ == '__main__':

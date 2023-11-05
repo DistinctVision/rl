@@ -41,7 +41,7 @@ class RandomReplayStateSetter(StateSetter):
         games = []
         for path in self.replay_data_paths[:max_readed_games]:
             proc_out = subprocess.run(['tools/rrrocket.exe', '-n', str(path)], capture_output=True)
-            json_data = json.loads(proc_out.stdout.decode('utf-8', errors='ignore'))
+            json_data = json.loads(proc_out.stdout.decode('cp1251', errors='ignore'))
             game = Game()
             game.initialize(loaded_json=json_data)
             games.append(game)

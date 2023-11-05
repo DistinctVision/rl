@@ -1,12 +1,12 @@
 model:
   sequence_size: 1
 
-  policy_net_layers: [256, 128]
-  value_net_layers: [256, 128]
+  policy_net_layers: [256, 256]
+  value_net_layers: [256, 256]
   dropout: 0.0
 
-  _models_path: '..\rl_output\ppo_10_31_2023__23_36_20\weights\best_ppo.kpt'
-  _optimizer_path: '..\rl_output\ppo_10_31_2023__23_36_20\weights\opt_ppo_595.kpt'
+  models_path: '..\rl_output\ppo_11_05_2023__17_46_39\weights\ppocket_rocket_170.kpt'
+  optimizer_path: '..\rl_output\ppo_11_05_2023__17_46_39\weights\opt_ppocket_rocket_170.kpt'
   
 game:
   fps: 10
@@ -14,11 +14,11 @@ game:
 replays:
   data_folder: '..\rl_replays'
   max_readed_games: 5
-  reread_games_every_n_step: 10000
+  reread_games_every_n_step: 1000
 
 rollout:
   observation_size: 43
-  max_buffer_size: 16384
+  max_buffer_size: 32768
   calc_batch_size: 512
   discount_factor: 0.99
   gae_lambda: 0.95
@@ -27,7 +27,7 @@ training:
   lr: 3e-4
   n_epochs: 10
   
-  batch_size: 512
+  batch_size: 256
   grad_norm: 0.5
 
   ppo:
@@ -39,9 +39,9 @@ training:
   output_folder: ../rl_output
   
   save:
-    model_name: ppo
+    model_name: ppocket_rocket
     save_every_n_step: 5
     n_last_steps: 10
     target_metric: mean_reward
     target_op: '>'
-    save_hist_every_n_step: 1
+    save_hist_every_n_step: 10

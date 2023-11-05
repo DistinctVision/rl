@@ -2,6 +2,7 @@ import typing as tp
 from pathlib import Path
 
 import math
+from copy import deepcopy
 
 import numpy as np
 
@@ -20,27 +21,25 @@ def signed_sqrt(x: float) -> float:
     return math.sqrt(x)
 
 
-class DistToBallReward(RewardFunction):
+class ClosestToBallReward(RewardFunction):
     
-    def __init__(self, scale: float = 1.0 / BALL_RADIUS):
+    def __init__(self, value: float = 1.0):
         super().__init__()
-        self.scale = scale
-        self.prev_distances: tp.Dict[int, float] = {}
+        self.value = value
         self.cur_distances: tp.Dict[int, float] = {}
         
     def reset(self, initial_state: GameState):
-        self.prev_distances = {}
         self.cur_distances = {}
         for player in initial_state.players:
             dis = np.linalg.norm(player.car_data.position - initial_state.ball.position)
-            self.cur_distances[player.car_id] = dis * self.scale
+            self.cur_distances[player.car_id] = dis
 
     def pre_step(self, state: GameState):
         self.prev_distances = self.cur_distances
         self.cur_distances = {}
         for player in state.players:
             dis = np.linalg.norm(player.car_data.position - state.ball.position)
-            self.cur_distances[player.car_id] = dis * self.scale
+            self.cur_distances[player.car_id] = dis
         
     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
         enemy = None
@@ -48,18 +47,38 @@ class DistToBallReward(RewardFunction):
             if car.car_id != player.car_id:
                 enemy = car
                 break
-        prev_delta_dis = self.prev_distances[enemy.car_id] - self.prev_distances[player.car_id]
-        cur_delta_dis = self.cur_distances[enemy.car_id] - self.cur_distances[player.car_id]
+        if self.cur_distances[player.car_id] < self.cur_distances[enemy.car_id]:
+            return self.value
+        return -self.value
+    
+    
+class LastTouchReward(RewardFunction):
+    
+    def __init__(self, value: float = 1.0):
+        super().__init__()
+        self.value = value
+        self.last_touch_car_id: tp.Optional[int] = None
         
-        time_delta_dis = cur_delta_dis - prev_delta_dis
-        return signed_sqrt(time_delta_dis)
+    def reset(self, initial_state: GameState):
+        self.last_touch_car_id: tp.Optional[int] = None
+
+    def pre_step(self, state: GameState):
+        for player in state.players:
+            if player.ball_touched:
+                self.last_touch_car_id = player.car_id
+                break
+        
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+        if player.car_id == self.last_touch_car_id:
+            return self.value
+        return 0
     
     
 class DistBallToGoalReward(RewardFunction):
     ORANGE_GOAL = (np.array(ORANGE_GOAL_BACK) + np.array(ORANGE_GOAL_CENTER)) / 2
     BLUE_GOAL = (np.array(BLUE_GOAL_BACK) + np.array(BLUE_GOAL_CENTER)) / 2
     
-    def __init__(self, scale: float = 10.0 / BALL_RADIUS):
+    def __init__(self, scale: float = 1e3 / BALL_RADIUS):
         super().__init__()
         self.scale = scale
         self.prev_dis_to_orange_goal = 0.0
@@ -80,15 +99,15 @@ class DistBallToGoalReward(RewardFunction):
         self.cur_dis_to_blue_goal = np.linalg.norm(state.ball.position - self.BLUE_GOAL) * self.scale
         
     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
-        delta_blue_dis = (self.cur_dis_to_blue_goal - self.prev_dis_to_blue_goal)
-        delta_orange_dis = (self.cur_dis_to_orange_goal - self.prev_dis_to_orange_goal)
+        delta_blue_dis = (self.cur_dis_to_blue_goal - self.prev_dis_to_blue_goal) / max(self.cur_dis_to_blue_goal, 1)
+        delta_orange_dis = (self.cur_dis_to_orange_goal - self.prev_dis_to_orange_goal) / max(self.cur_dis_to_orange_goal, 1)
         if player.team_num == BLUE_TEAM:
-            return signed_sqrt(delta_blue_dis - delta_orange_dis)
-        return signed_sqrt(delta_orange_dis - delta_blue_dis)
+            return (delta_blue_dis - delta_orange_dis)
+        return (delta_orange_dis - delta_blue_dis)
 
 
 class AlignBallGoal(RewardFunction):
-    def __init__(self, defense=10.0, offense=10.0):
+    def __init__(self, defense=0.01, offense=0.01):
         super().__init__()
         self.defense = defense
         self.offense = offense
@@ -117,7 +136,7 @@ class AlignBallGoal(RewardFunction):
     
 class SaveBoostReward(RewardFunction):
     
-    def __init__(self, scale: float = 0.1):
+    def __init__(self, scale: float = 1e-3):
         self.scale = scale
     
     def reset(self, initial_state: GameState):
@@ -143,40 +162,117 @@ class TouchBallReward(RewardFunction):
         return self.value * height_weight
     
     
-class GoalReward(RewardFunction):
+class DemolutionReward(RewardFunction):
     
-    def __init__(self, value: float = 1000.0):
+    def __init__(self, value: float = 1e2):
         self.value = value
+        self.prev = {
+            'orange': False,
+            'blue': False
+        }
+        self.cur = deepcopy(self.prev)
         
     def reset(self, initial_state: GameState):
-        self.blue_score = initial_state.blue_score
-        self.orange_score = initial_state.orange_score
+        self.prev = {
+            'orange': False,
+            'blue': False
+        }
+        self.cur = deepcopy(self.prev)
+
+    def pre_step(self, state: GameState):
+        self.prev = deepcopy(self.cur)
+        for player in state.players:
+            team_name = 'orange' if player.team_num == ORANGE_TEAM else 'blue'
+            self.cur[team_name] = player.is_demoed
 
     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
-        if state.blue_score > self.blue_score:
-            self.blue_score = state.blue_score
-            if player.team_num == BLUE_TEAM:
-                return self.value
-            return - self.value
-        if state.orange_score > self.orange_score:
-            self.orange_score = state.orange_score
-            if player.team_num == BLUE_TEAM:
-                return - self.value
-            return self.value
-        return 0
+        score = 0
+        if player.team_num == ORANGE_TEAM:
+            player_team = 'orange'
+            enemy_team = 'blue'
+        else:
+            player_team = 'blue'
+            enemy_team = 'orange'
+        if self.cur[player_team] and self.cur[player_team] != self.prev[player_team]:
+            score -= self.value
+        if self.cur[enemy_team] and self.cur[enemy_team] != self.prev[enemy_team]:
+            score += self.value
+            
+        return score
+            
+    
+    
+class GoalReward(RewardFunction):
+    
+    def __init__(self, discount_factor: float, penalty: float = 1.0, goal_reward: float = 10.0):
+        self.discount_factor = discount_factor
+        self.penalty = penalty
+        self.goal_reward = goal_reward
+        self.prev_scores = {
+            'orange': 0,
+            'blue': 0
+        }
+        self.cur_scores = deepcopy(self.prev_scores)
+        self.prev_rewards = {
+            'orange': 0,
+            'blue': 0
+        }
+        self.cur_rewards = deepcopy(self.prev_rewards)
+        
+    def reset(self, initial_state: GameState):
+        self.prev_scores = {
+            'orange': initial_state.orange_score,
+            'blue': initial_state.blue_score
+        }
+        self.cur_scores = deepcopy(self.prev_scores)
+        self.prev_rewards = {
+            'orange': 0,
+            'blue': 0
+        }
+        self.cur_rewards = deepcopy(self.prev_rewards)
+
+    def pre_step(self, state: GameState):
+        self.prev_scores = deepcopy(self.cur_scores)
+        self.cur_scores = {
+            'orange': state.orange_score,
+            'blue': state.blue_score
+        }
+        self.prev_rewards = deepcopy(self.cur_rewards)
+        self.cur_rewards = {
+            team_name: reward * self.discount_factor
+            for team_name, reward in self.prev_rewards.items()
+        }
+        
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+        (player_team_name, enemy_team_name) = ('blue', 'orange') if player.team_num == BLUE_TEAM else ('orange', 'blue')
+        if self.cur_scores[player_team_name] > self.prev_scores[player_team_name]:
+            return self.goal_reward - self.cur_rewards[player_team_name] * 2
+        elif self.cur_scores[enemy_team_name] > self.prev_scores[enemy_team_name]:
+            return self.cur_rewards[player_team_name] * 2 - self.goal_reward
+        self.cur_rewards[player_team_name] -= self.penalty
+        return - self.penalty
+                
+    
+class ConstantReward(RewardFunction):
+    def __init__(self, value: float = 1e-2):
+        super().__init__()
+        self.value = value
+    
+    def reset(self, initial_state: GameState):
+        pass
+
+    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
+        return - self.value
     
 
 class GeneralReward(RewardFunction):
     
-    def __init__(self):
+    def __init__(self, discount_factor: float):
         super().__init__()
         self.rewards: tp.Dict[str, RewardFunction] = {
-            'dist_to_ball': DistToBallReward(),
-            'dist_ball_to_goal': DistBallToGoalReward(),
-            'align_ball': AlignBallGoal(),
-            'save_boost': SaveBoostReward(),
-            'touch_ball': TouchBallReward(),
-            'goal': GoalReward()
+            'closest_to_ball': ClosestToBallReward(),
+            'last_touch': LastTouchReward(),
+            'goal_reward': GoalReward(discount_factor=discount_factor)
         }
         
     def reset(self, initial_state: GameState):
