@@ -20,10 +20,13 @@ class ExtNextoObsData:
 
 class ExtNextoObsBuilder(ObsBuilder):
     
-    def __init__(self, model_data_provider: ModelDataProvider(), use_mirror: bool = False):
+    def __init__(self, model_data_provider: ModelDataProvider(),
+                 orange_mirror: bool = True,
+                 double_mirror: bool = False):
         super().__init__()
         self.next_obs_builder = NextoObsBuilder()
-        self.gym_obs_builder = GymObsBuilder(model_data_provider=model_data_provider, double_mirror=use_mirror)
+        self.gym_obs_builder = GymObsBuilder(model_data_provider=model_data_provider,
+                                             orange_mirror=orange_mirror, double_mirror=double_mirror)
 
     def reset(self, initial_state: GameState):
         self.next_obs_builder.reset(initial_state)

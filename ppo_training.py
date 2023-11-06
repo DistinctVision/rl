@@ -1,6 +1,7 @@
 import  typing as tp
 from pathlib import Path
 import math
+import random
 import yaml
 from collections import deque
 
@@ -18,25 +19,27 @@ from ppocket_rocket.training.ppo_trainer import PpoTrainer
 from ppocket_rocket.training.rollout import RolloutBuffer, RolloutDataset
 from ppocket_rocket.training import GymActionParser, GymObsBuilder, GeneralReward
 from ppocket_rocket.training.state_setter import GeneralStateSetter
+from Nexto.ext_nexto_obs_builder import ExtNextoObsBuilder, ExtNextoObsData
+from Nexto.agent import Agent as NextoAgent
 
 
-def fix_data(data) -> tp.List[torch.Tensor]:
+def fix_data(data) -> tp.List[tp.Union[torch.Tensor, ExtNextoObsData]]:
     """
     This is a workaround to fix the bug inside sb3. Just reformat output data.
     """
     
-    if isinstance(data, torch.Tensor):
+    if isinstance(data, (torch.Tensor, ExtNextoObsData)):
         return [data]
     out  = []
     for d in data:
-        if len(d) == 0:
-            continue
-        if isinstance(d, torch.Tensor):
+        if isinstance(d, (torch.Tensor, ExtNextoObsData)):
             out.append(d)
+            continue
+        if len(d) == 0:
             continue
         assert isinstance(d,  list)
         for e in d:
-            assert isinstance(e,  torch.Tensor)
+            assert isinstance(e, (torch.Tensor, ExtNextoObsData))
             out.append(e)
     return out
 
@@ -75,10 +78,13 @@ def ppo_training(num_of_env_instances: int):
     
     model_data_provider = ModelDataProvider()
     action_parser = GymActionParser(model_data_provider)
-    obs_builder = GymObsBuilder(model_data_provider, orange_mirror=True)
     general_reward = GeneralReward(discount_factor=discount_factor)
     trainer = PpoTrainer(cfg, device)
     actor_critic_policy = trainer.models
+    
+    # obs_builder = GymObsBuilder(model_data_provider, orange_mirror=True)
+    ext_obs_builder = ExtNextoObsBuilder(model_data_provider, orange_mirror=True)
+    nexto_agent = NextoAgent(result_as_index=True)
     
     blue_mem_reward_values = {reward_name: deque(maxlen=10_000) for reward_name in general_reward.rewards}
     orange_mem_reward_values = {reward_name: deque(maxlen=10_000) for reward_name in general_reward.rewards}
@@ -91,10 +97,10 @@ def ppo_training(num_of_env_instances: int):
         return Match(
             reward_function=general_reward,
             terminal_conditions=[TimeoutCondition(30 * 10), GoalScoredCondition()],
-            obs_builder=obs_builder,
+            obs_builder=ext_obs_builder,
             state_setter=GeneralStateSetter(dict(cfg['replays'])),
             action_parser=action_parser,
-            game_speed=100, tick_skip=12, spawn_opponents=True, team_size=1
+            game_speed=100, tick_skip=8, spawn_opponents=True, team_size=1
         )
 
     env = SB3MultipleInstanceEnv(match_func_or_matches=get_match,
@@ -104,28 +110,71 @@ def ppo_training(num_of_env_instances: int):
     ep_counter = 0
     
     while True:
-        cur_rollout_buffers = [RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size)
-                               for _ in range(num_of_env_instances * num_cars)]
+        cur_rollout_buffers: tp.List[tp.Optional[RolloutBuffer]] = []
+        
+        for _ in range(num_of_env_instances):
+            has_nexto = np.random.choice([False, True])
+            if has_nexto:
+                nexto_team = np.random.choice([0, 1])
+                if nexto_team == 0:
+                    cur_rollout_buffers.append(None)
+                    cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net,
+                                                             sequence_size))
+                else:
+                    cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net,
+                                                             sequence_size))
+                    cur_rollout_buffers.append(None)
+            else:
+                cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size))
+                cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size))
+                
+        nexto_betas: tp.List[tp.Optional[float]] = []
         for cur_rollout_buffer in cur_rollout_buffers:
-            cur_rollout_buffer.start()
+            if cur_rollout_buffer is not None:
+                cur_rollout_buffer.start()
+                nexto_betas.append(None)
+            else:
+                nexto_betas.append(random.uniform(0, 1))
         
         obs = env.reset()
         obs = fix_data(obs)
+        
+        nexto_obs = [c_obs.nexto_obs for c_obs in obs]
+        obs = [c_obs.gym_obs for c_obs in obs]
+        
         dones = np.array([False for _ in  range(num_cars * num_of_env_instances)], dtype=bool)
         
         steps = 0
-        ep_rewards = np.zeros((num_of_env_instances * num_cars), dtype=float)
+        ep_rewards = [0 if cur_rollout_buffer is not None else None for cur_rollout_buffer in cur_rollout_buffers]
         
         while not dones.all():
-            action_dists = [actor_critic_policy.get_action_dist(cur_rollout_buffer.new_state(obs_tensor))
-                            for cur_rollout_buffer, obs_tensor in zip(cur_rollout_buffers, obs)]
-            actions = [int(action_dict.sample()) for action_dict in action_dists]
+            action_dists: tp.List[torch.distributions.Categorical] = []
+            actions: tp.List[int] = []
+            for cur_rollout_buffer, obs_tensor, nexto_state, nexto_beta in \
+                            zip(cur_rollout_buffers, obs, nexto_obs, nexto_betas):
+                if cur_rollout_buffer is not None:
+                    action_dist = actor_critic_policy.get_action_dist(cur_rollout_buffer.new_state(obs_tensor))
+                    action = int(action_dist.sample())
+                    action_dists.append(action_dist)
+                    actions.append(action)
+                else:
+                    action = nexto_agent.act(nexto_state, nexto_beta)
+                    action_dists.append(None)
+                    actions.append(action)
+                    
             env.step_async(actions)
             next_obs, splitted_rewards, next_dones, gameinfo = env.step_wait()
             next_obs = fix_data(next_obs)
+        
+            next_nexto_obs = [c_obs.nexto_obs for c_obs in next_obs]
+            next_obs = [c_obs.gym_obs for c_obs in next_obs]
             
             rewards = []
-            for env_idx, env_splitted_rewards in enumerate(splitted_rewards):
+            for env_idx, (env_splitted_rewards, cur_rollout_buffer) in \
+                            enumerate(zip(splitted_rewards, cur_rollout_buffers)):
+                if cur_rollout_buffer is None:
+                    rewards.append(None)
+                    continue
                 mem_reward_values = blue_mem_reward_values if env_idx % 2 == 0 else orange_mem_reward_values
                 reward = 0.0
                 for reward_name, reward_value in env_splitted_rewards.items():
@@ -134,12 +183,11 @@ def ppo_training(num_of_env_instances: int):
                 rewards.append(reward)
 
             for car_idx in range(num_of_env_instances * num_cars):
-                if dones[car_idx]:
+                cur_rollout_buffer = cur_rollout_buffers[car_idx]
+                if dones[car_idx] or cur_rollout_buffer is None:
                     continue
                 action_log_prob = float(action_dists[car_idx].log_prob(torch.tensor(actions[car_idx])))
-                cur_rollout_buffers[car_idx].add(obs[car_idx],
-                                                 actions[car_idx], action_log_prob,
-                                                 rewards[car_idx])
+                cur_rollout_buffer.add(obs[car_idx], actions[car_idx], action_log_prob, rewards[car_idx])
             
             if steps >= rollout_max_buffer_size:
                 next_dones_ = []
@@ -150,16 +198,22 @@ def ppo_training(num_of_env_instances: int):
                 next_dones = np.array(next_dones_, dtype=bool)
             
             for car_idx in range(num_of_env_instances * num_cars):
-                if not next_dones[car_idx]:
+                cur_rollout_buffer = cur_rollout_buffers[car_idx]
+                if not next_dones[car_idx] or cur_rollout_buffer is None:
                     continue
                 state = gameinfo[car_idx]
-                cur_rollout_buffers[car_idx].finish(next_obs[car_idx], truncated=state['TimeLimit.truncated'])
+                cur_rollout_buffer.finish(next_obs[car_idx], truncated=state['TimeLimit.truncated'])
             
-            ep_rewards += rewards
+            for idx, reward in enumerate(rewards):
+                if reward is None:
+                    continue
+                ep_rewards[idx] += reward
             obs = next_obs
+            nexto_obs = next_nexto_obs
             dones = np.logical_or(dones, next_dones)
             steps += 1
         
+        ep_rewards = [reward for reward in ep_rewards if reward is not None]
         for reward in ep_rewards:
             last_rewards.append(reward)
         last_mean_reward = sum(last_rewards) / len(last_rewards)
@@ -176,6 +230,8 @@ def ppo_training(num_of_env_instances: int):
         
         ep_counter += 1
         
+        cur_rollout_buffers = [cur_rollout_buffer for cur_rollout_buffer in cur_rollout_buffers
+                               if cur_rollout_buffer is not None]
         assert all([cur_rollout_buffer.is_finished for cur_rollout_buffer in cur_rollout_buffers])
         rollout_buffers += cur_rollout_buffers
         
