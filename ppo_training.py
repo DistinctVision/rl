@@ -113,20 +113,20 @@ def ppo_training(num_of_env_instances: int):
         cur_rollout_buffers: tp.List[tp.Optional[RolloutBuffer]] = []
         
         for _ in range(num_of_env_instances):
-            has_nexto = np.random.choice([False, True])
-            if has_nexto:
-                nexto_team = np.random.choice([0, 1])
-                if nexto_team == 0:
-                    cur_rollout_buffers.append(None)
-                    cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net,
-                                                             sequence_size))
-                else:
-                    cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net,
-                                                             sequence_size))
-                    cur_rollout_buffers.append(None)
-            else:
-                cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size))
-                cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size))
+            # has_nexto = np.random.choice([False, True])
+            # if has_nexto:
+            #     nexto_team = np.random.choice([0, 1])
+            #     if nexto_team == 0:
+            #         cur_rollout_buffers.append(None)
+            #         cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net,
+            #                                                  sequence_size))
+            #     else:
+            #         cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net,
+            #                                                  sequence_size))
+            #         cur_rollout_buffers.append(None)
+            # else:
+            cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size))
+            cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size))
                 
         nexto_betas: tp.List[tp.Optional[float]] = []
         for cur_rollout_buffer in cur_rollout_buffers:

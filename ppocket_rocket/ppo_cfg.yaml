@@ -5,8 +5,8 @@ model:
   value_net_layers: [256, 256]
   dropout: 0.0
 
-  models_path: '..\rl_output\ppo_11_05_2023__21_56_57\weights\ppocket_rocket_780.kpt'
-  optimizer_path: '..\rl_output\ppo_11_05_2023__21_56_57\weights\opt_ppocket_rocket_780.kpt'
+  _models_path: '..\rl_output\ppo_11_06_2023__23_55_21\weights\ppocket_rocket_1665.kpt'
+  _optimizer_path: '..\rl_output\ppo_11_06_2023__23_55_21\weights\opt_ppocket_rocket_1665.kpt'
   
 game:
   fps: 12
@@ -18,7 +18,7 @@ replays:
 
 rollout:
   observation_size: 43
-  max_buffer_size: 8192
+  max_buffer_size: 32768
   calc_batch_size: 256
   discount_factor: 0.99
   gae_lambda: 0.95
@@ -27,7 +27,7 @@ training:
   lr: 3e-4
   n_epochs: 10
   
-  batch_size: 256
+  batch_size: 1024
   grad_norm: 0.5
 
   ppo:
