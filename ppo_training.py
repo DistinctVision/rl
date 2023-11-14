@@ -61,7 +61,7 @@ def save_histograms(save_folder_path: tp.Union[Path, str], mem_rewards_values: t
     
 
 
-def ppo_training(num_of_env_instances: int):
+def ppo_training(num_of_env_instances: int, tag: str):
     device = 'cuda'
     
     cfg = yaml.safe_load(open(Path('ppocket_rocket') / 'ppo_cfg.yaml', 'r'))
@@ -79,7 +79,7 @@ def ppo_training(num_of_env_instances: int):
     model_data_provider = ModelDataProvider()
     action_parser = GymActionParser(model_data_provider)
     general_reward = GeneralReward(discount_factor=discount_factor)
-    trainer = PpoTrainer(cfg, device)
+    trainer = PpoTrainer(cfg, device, tag)
     actor_critic_policy = trainer.models
     
     # obs_builder = GymObsBuilder(model_data_provider, orange_mirror=True)
@@ -96,7 +96,7 @@ def ppo_training(num_of_env_instances: int):
     def get_match():
         return Match(
             reward_function=general_reward,
-            terminal_conditions=[TimeoutCondition(30 * 10), GoalScoredCondition()],
+            terminal_conditions=[TimeoutCondition(90 * 12), GoalScoredCondition()],
             obs_builder=ext_obs_builder,
             state_setter=GeneralStateSetter(dict(cfg['replays'])),
             action_parser=action_parser,
@@ -106,14 +106,14 @@ def ppo_training(num_of_env_instances: int):
     env = SB3MultipleInstanceEnv(match_func_or_matches=get_match,
                                  num_instances=num_of_env_instances, wait_time=30)
 
-    last_rewards = deque(maxlen=50)
+    last_rewards = deque(maxlen=200)
     ep_counter = 0
     
     while True:
         cur_rollout_buffers: tp.List[tp.Optional[RolloutBuffer]] = []
         
         for _ in range(num_of_env_instances):
-            # has_nexto = np.random.choice([False, True])
+            # has_nexto = np.random.choice([False, False, True])
             # if has_nexto:
             #     nexto_team = np.random.choice([0, 1])
             #     if nexto_team == 0:
@@ -256,6 +256,7 @@ if __name__ == '__main__':
     
     args_parser = ArgumentParser()
     args_parser.add_argument('-n', '--num_instances', type=int, default=1)
+    args_parser.add_argument('--tag', type=str, default='%dt')
     args = args_parser.parse_args()
     
-    ppo_training(args.num_instances)
+    ppo_training(args.num_instances, args.tag)

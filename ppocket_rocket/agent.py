@@ -108,10 +108,10 @@ class PPocketRoecket(BaseAgent):
         self.game_state.decode(packet)
         agent: PlayerData = self.game_state.players[self.team]
         player: PlayerData = self.game_state.players[1 - self.team]
-        world_state_1 = self._build_world_state(agent, agent.car_data, player, player.car_data, self.game_state.ball, self.game_state.boost_pads)
+        # world_state_1 = self._build_world_state(agent, agent.car_data, player, player.car_data, self.game_state.ball, self.game_state.boost_pads)
         
         world_state = WorldState.from_game_packet(packet)
-        world_states_tensor = self.data_provider.world_state_to_tensor(world_state_1, self.team, self.device)
+        world_states_tensor = self.data_provider.world_state_to_tensor(world_state, self.team, self.device)
         
         with torch.no_grad():
             logits: torch.Tensor = self.policy_net(world_states_tensor.unsqueeze(0))

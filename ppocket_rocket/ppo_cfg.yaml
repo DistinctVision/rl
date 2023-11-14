@@ -1,12 +1,12 @@
 model:
   sequence_size: 1
 
-  policy_net_layers: [256, 256]
-  value_net_layers: [256, 256]
+  policy_net_layers: [512, 256, 128]
+  value_net_layers: [512, 256, 128]
   dropout: 0.0
 
-  _models_path: '..\rl_output\ppo_11_06_2023__23_55_21\weights\ppocket_rocket_1665.kpt'
-  _optimizer_path: '..\rl_output\ppo_11_06_2023__23_55_21\weights\opt_ppocket_rocket_1665.kpt'
+  models_path: '..\rl_output\ppo_new_without_nexto_11_12_2023__23_18_39\weights\ppocket_rocket_1775.kpt'
+  optimizer_path: '..\rl_output\ppo_new_without_nexto_11_12_2023__23_18_39\weights\opt_ppocket_rocket_1775.kpt'
   
 game:
   fps: 12

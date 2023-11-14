@@ -73,83 +73,21 @@ class LastTouchReward(RewardFunction):
             return self.value
         return 0
     
-    
-class DistBallToGoalReward(RewardFunction):
-    ORANGE_GOAL = (np.array(ORANGE_GOAL_BACK) + np.array(ORANGE_GOAL_CENTER)) / 2
-    BLUE_GOAL = (np.array(BLUE_GOAL_BACK) + np.array(BLUE_GOAL_CENTER)) / 2
-    
-    def __init__(self, scale: float = 1e3 / BALL_RADIUS):
-        super().__init__()
-        self.scale = scale
-        self.prev_dis_to_orange_goal = 0.0
-        self.prev_dis_to_blue_goal = 0.0
-        self.cur_dis_to_orange_goal = 0.0
-        self.cur_dis_to_blue_goal = 0.0
-
-    def reset(self, initial_state: GameState):
-        self.prev_dis_to_orange_goal = 0.0
-        self.prev_dis_to_blue_goal = 0.0
-        self.cur_dis_to_orange_goal = np.linalg.norm(initial_state.ball.position - self.ORANGE_GOAL) * self.scale
-        self.cur_dis_to_blue_goal = np.linalg.norm(initial_state.ball.position - self.BLUE_GOAL) * self.scale
-
-    def pre_step(self, state: GameState):
-        self.prev_dis_to_orange_goal = self.cur_dis_to_orange_goal
-        self.prev_dis_to_blue_goal = self.cur_dis_to_blue_goal
-        self.cur_dis_to_orange_goal = np.linalg.norm(state.ball.position - self.ORANGE_GOAL) * self.scale
-        self.cur_dis_to_blue_goal = np.linalg.norm(state.ball.position - self.BLUE_GOAL) * self.scale
-        
-    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
-        delta_blue_dis = (self.cur_dis_to_blue_goal - self.prev_dis_to_blue_goal) / max(self.cur_dis_to_blue_goal, 1)
-        delta_orange_dis = (self.cur_dis_to_orange_goal - self.prev_dis_to_orange_goal) / max(self.cur_dis_to_orange_goal, 1)
-        if player.team_num == BLUE_TEAM:
-            return (delta_blue_dis - delta_orange_dis)
-        return (delta_orange_dis - delta_blue_dis)
-
-
-class AlignBallGoal(RewardFunction):
-    def __init__(self, defense=0.01, offense=0.01):
-        super().__init__()
-        self.defense = defense
-        self.offense = offense
-
-    def reset(self, initial_state: GameState):
-        pass
-
-    def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
-        ball = state.ball.position
-        pos = player.car_data.position
-        protecc = np.array(BLUE_GOAL_BACK)
-        attacc = np.array(ORANGE_GOAL_BACK)
-        if player.team_num == ORANGE_TEAM:
-            protecc, attacc = attacc, protecc
-            
-        delta_ball_pos = ball - pos
-
-        # Align player->ball and net->player vectors
-        defensive_reward = self.defense * rl_math.cosine_similarity(delta_ball_pos, pos - protecc)
-
-        # Align player->ball and player->net vectors
-        offensive_reward = self.offense * rl_math.cosine_similarity(delta_ball_pos, attacc - pos)
-
-        return defensive_reward + offensive_reward
-    
-    
 class SaveBoostReward(RewardFunction):
     
-    def __init__(self, scale: float = 1e-3):
+    def __init__(self,  scale: float  = 10.0):
         self.scale = scale
     
     def reset(self, initial_state: GameState):
         pass
 
     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
-        # 1 reward for each frame with 100 boost, sqrt because 0->20 makes bigger difference than 80->100
-        return np.sqrt(player.boost_amount) * self.scale
+        return player.boost_amount *  self.scale
     
     
 class TouchBallReward(RewardFunction):
     
-    def __init__(self, value: float = 10.0):
+    def __init__(self, value: float = 100.0):
         self.value = value
         
     def reset(self, initial_state: GameState):
@@ -158,7 +96,7 @@ class TouchBallReward(RewardFunction):
     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
         if not player.ball_touched:
             return 0.0
-        height_weight = 1 + (state.ball.position[2] - BALL_RADIUS) / CEILING_Z
+        height_weight = (state.ball.position[2] - BALL_RADIUS) / CEILING_Z
         return self.value * height_weight
     
     
@@ -272,6 +210,8 @@ class GeneralReward(RewardFunction):
         self.rewards: tp.Dict[str, RewardFunction] = {
             'closest_to_ball': ClosestToBallReward(),
             'last_touch': LastTouchReward(),
+            'save_boost': SaveBoostReward(),
+            'touch_ball': TouchBallReward(),
             'goal_reward': GoalReward(discount_factor=discount_factor)
         }
         

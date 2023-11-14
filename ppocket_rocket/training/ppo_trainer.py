@@ -39,10 +39,15 @@ class PpoTrainer:
 
     def __init__(self,
                  cfg: tp.Dict[str, tp.Any],
-                 device: tp.Union[torch.device, str]):
+                 device: tp.Union[torch.device, str],
+                 tag: str):
         self.cfg = cfg
         self.logger = logging.getLogger(__name__)
         self.device = torch.device(device)
+
+        training_cfg = self.cfg['training']
+        self.run_name = get_run_name(tag)
+        self.run_output_folder = make_output_folder(training_cfg['output_folder'], self.run_name, False)
 
         self.models: tp.Optional[ActorCriticPolicy] = None
         self.optimizer: tp.Optional[torch.optim.Optimizer] = None
@@ -58,21 +63,18 @@ class PpoTrainer:
         
     def _init_log(self):
         training_cfg = self.cfg['training']
-
-        run_name = get_run_name('ppo_%dt')
-        run_output_folder = make_output_folder(training_cfg['output_folder'], run_name, False)
         
-        logging.basicConfig(filename=run_output_folder / 'ppo.log',
+        logging.basicConfig(filename=self.run_output_folder / 'ppo.log',
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                             datefmt='%d-%b-%y %H:%M:%S',
                             level=logging.INFO)
-        self.cfg['meta'] = {'run_name': run_name}
-        with open(run_output_folder / 'cfg.yaml', 'w') as cfg_file:
+        self.cfg['meta'] = {'run_name': self.run_name}
+        with open(self.run_output_folder / 'cfg.yaml', 'w') as cfg_file:
             yaml.safe_dump(self.cfg, cfg_file)
-        output_weights_folder: Path = run_output_folder / 'weights'
+        output_weights_folder: Path = self.run_output_folder / 'weights'
         output_weights_folder.mkdir()
-        self.log_writer = LogWriter(output_plot_folder=run_output_folder,
-                                    project_name='RL', run_name=run_name,
+        self.log_writer = LogWriter(output_plot_folder=self.run_output_folder,
+                                    project_name='RL', run_name=self.run_name,
                                     output_weights_folder=output_weights_folder,
                                     save_cfg=training_cfg['save'])
 
