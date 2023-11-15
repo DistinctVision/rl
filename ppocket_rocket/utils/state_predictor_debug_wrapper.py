@@ -12,6 +12,7 @@ from rlbot.utils.structures.game_data_struct import GameTickPacket
 
 from ppocket_rocket.game_data import WorldState, ActionState, ModelDataProvider
 from ppocket_rocket.state_predictor import StatePredictorModel
+from ppocket_rocket.model import get_model_num_params
 
 
 AgentType = tp.TypeVar('AgentType', bound=BaseAgent, covariant=True)
@@ -42,15 +43,16 @@ class StatePredictorDebugWrapper(tp.Generic[AgentType], BaseAgent):
         return instance
     
     def __init__(self, name, team, index):
-        cfg = yaml.safe_load(open(Path(__file__).parent / '..' / 'cfg.yaml', 'r'))
+        cfg = yaml.safe_load(open(Path(__file__).parent / '..' / 'dqn_cfg.yaml', 'r'))
         game_cfg = cfg['game']
         rnn_model_cfg = cfg['model']['rnn']
-        data_provider = ModelDataProvider()
-        state_model_predictor = StatePredictorModel.build_model(rnn_model_cfg, data_provider)
+        data_provider = ModelDataProvider(use_scale=False)
+        state_model_predictor = StatePredictorModel.build_model(cfg['model'], data_provider)
         state_model_predictor_cpkt = torch.load(rnn_model_cfg['state_predictor_path'])
         state_model_predictor.load_state_dict(state_model_predictor_cpkt)
         state_model_predictor.eval()
         state_model_predictor = state_model_predictor.cuda()
+        print(f'Size model: {get_model_num_params(state_model_predictor)}')
         self.state_predictor_data = StatePredictorDebugData(fps=float(game_cfg['fps']),
                                                             model=state_model_predictor,
                                                             team_idx=team)
@@ -126,7 +128,7 @@ class StatePredictorDebugWrapper(tp.Generic[AgentType], BaseAgent):
                     self.draw_state_debug(self.state_predictor_data.last_world_states)
                 return controls
             dt = time_tick - self.state_predictor_data.last_time_tick
-            print(f'dt={dt:.3f}')
+            # print(f'dt={dt:.3f}')
         
         self.state_predictor_data.last_world_states = self.predict(packet, controls, 10)
         self.draw_state_debug(self.state_predictor_data.last_world_states)

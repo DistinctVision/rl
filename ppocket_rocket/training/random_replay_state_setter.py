@@ -54,6 +54,12 @@ class RandomReplayStateSetter(StateSetter):
             print(f'Replays reading...')
             self._read_random_games()
         return np.random.choice(self.games)
+    
+    def _check_null_vals(self, dict_values: tp.Dict[str, tp.Any], check_keys: tp.List[str]):
+        for value_name in check_keys:
+            if dict_values[value_name] is None:
+                raise ValueError(f'Value "{value_name}" is None')
+        
 
     def reset(self, state_wrapper: StateWrapper):
         
@@ -66,19 +72,42 @@ class RandomReplayStateSetter(StateSetter):
                 frame_idx = random.randint(0, time_size - 1)
                 
                 ball_info = game.ball.loc[frame_idx]
+                # self._check_null_vals(ball_info, ['pos_x', 'pos_y', 'pos_z',
+                #                                   'vel_x', 'vel_y', 'vel_z',
+                #                                   'ang_vel_x', 'ang_vel_y', 'ang_vel_z'])
                 
-                players_info = [game.players[player_idx].data.loc[frame_idx] for player_idx in range(len(state_wrapper.cars))]
+                players_info = []
+                for player_idx in range(len(state_wrapper.cars)):
+                    player_info = game.players[player_idx].data.loc[frame_idx]
+                    # self._check_null_vals(player_info, ['pos_x', 'pos_y', 'pos_z', 'vel_x', 'vel_y', 'vel_z',
+                    #                                     'ang_vel_x', 'ang_vel_y', 'ang_vel_z',
+                    #                                     'rot_x', 'rot_y', 'rot_z', 'boost'])
+                    players_info.append(player_info)
                 
-                state_wrapper.ball.set_pos(ball_info['pos_x'], ball_info['pos_y'], ball_info['pos_z'])
-                state_wrapper.ball.set_lin_vel(ball_info['vel_x'], ball_info['vel_y'], ball_info['vel_z'])
-                state_wrapper.ball.set_ang_vel(ball_info['ang_vel_x'], ball_info['ang_vel_y'], ball_info['ang_vel_z'])
+                state_wrapper.ball.set_pos(float(ball_info['pos_x']),
+                                           float(ball_info['pos_y']),
+                                           float(ball_info['pos_z']))
+                state_wrapper.ball.set_lin_vel(float(ball_info['vel_x']),
+                                               float(ball_info['vel_y']),
+                                               float(ball_info['vel_z']))
+                state_wrapper.ball.set_ang_vel(float(ball_info['ang_vel_x']),
+                                               float(ball_info['ang_vel_y']),
+                                               float(ball_info['ang_vel_z']))
                 
                 for car, player_info in zip(state_wrapper.cars, players_info):
-                    car.set_pos(player_info['pos_x'], player_info['pos_y'], player_info['pos_z'])
-                    car.set_lin_vel(player_info['vel_x'], player_info['vel_y'], player_info['vel_z'])
-                    car.set_ang_vel(player_info['ang_vel_x'], player_info['ang_vel_y'], player_info['ang_vel_z'])
-                    car.set_rot(player_info['rot_x'], player_info['rot_y'], player_info['rot_z'])
-                    car.boost = player_info['boost']
+                    car.set_pos(float(player_info['pos_x']),
+                                float(player_info['pos_y']),
+                                float(player_info['pos_z']))
+                    car.set_lin_vel(float(player_info['vel_x']),
+                                    float(player_info['vel_y']),
+                                    float(player_info['vel_z']))
+                    car.set_ang_vel(float(player_info['ang_vel_x']),
+                                    float(player_info['ang_vel_y']),
+                                    float(player_info['ang_vel_z']))
+                    car.set_rot(float(player_info['rot_x']),
+                                float(player_info['rot_y']),
+                                float(player_info['rot_z']))
+                    car.boost = int(player_info['boost'])
                 break
             except Exception as ex:
                 logging.warning(f'RandomReplayStateSetter[{try_idx}]: {ex}')

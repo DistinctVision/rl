@@ -1,0 +1,2 @@
+rocketsim
+git+https://github.com/DistinctVision/rocket-league-gym-sim.git

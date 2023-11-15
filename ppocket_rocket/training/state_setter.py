@@ -1,5 +1,6 @@
 import typing as tp
 
+import random
 import numpy as np
 
 from rlgym.utils import StateSetter
@@ -13,6 +14,7 @@ from rlgym_tools.extra_state_setters.goalie_state import GoaliePracticeState
 from rlgym_tools.extra_state_setters.hoops_setter import HoopsLikeSetter
 from rlgym_tools.extra_state_setters.symmetric_setter import KickoffLikeSetter
 from rlgym_tools.extra_state_setters.wall_state import WallPracticeState
+from rlgym_sim.utils.state_setters import RandomState
 
 from .random_replay_state_setter import RandomReplayStateSetter
 
@@ -99,7 +101,8 @@ class GeneralStateSetter(StateSetter):
                  wall_prob: float = 0.05):
         super().__init__()
         self.setters = [
-            RandomReplayStateSetter(replays_cfg),
+            # RandomReplayStateSetter(replays_cfg),
+            RandomState(),
             BetterRandom(),
             DefaultState(),
             KickoffLikeSetter(),
@@ -127,3 +130,8 @@ class GeneralStateSetter(StateSetter):
         self.setters[i].reset(state_wrapper)
         for car in state_wrapper.cars:  # In case of 0 boost consumption rate we want it to be able to boost
             car.boost = max(car.boost, 0.01)
+        ball_speed = np.linalg.norm(state_wrapper.ball.linear_velocity)
+        if ball_speed == 0.0:
+            state_wrapper.ball.set_lin_vel(random.uniform(-1e-5, 1e-5),
+                                           random.uniform(-1e-5, 1e-5),
+                                           random.uniform(-1e-5, 1e-5))

@@ -3,12 +3,11 @@ model:
   
   rnn:
     action_dim: 32
-    inner_dim: 1024
     hidden_dim: 1024
+    inner_dim: 1024
     n_lstm_layers: 2
-
-    state_predictor_path: '../best_state_predictor.kpt'
-    state_predictor_optimizer_path: '../rl_output/state_predictor_10_27_2023__00_58_03/weights/opt_state_predictor_230.kpt'
+    state_predictor_path: ../rl_output/state_predictor_10_27_2023__13_46_19/weights/best_state_predictor.kpt
+    _state_predictor_optimizer_path: ../rl_output/state_predictor_10_27_2023__13_46_19/weights/opt_state_predictor_230.kpt
 
   layers: [256, 128]
   dropout: 0.0

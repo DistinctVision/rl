@@ -13,7 +13,7 @@ from rlgym_tools.sb3_utils import SB3MultipleInstanceEnv
 from ppocket_rocket.state_predictor import StatePredictorModel
 from ppocket_rocket.game_data import ModelDataProvider
 from ppocket_rocket.training import DqnTrainer, ReplayBuffer, DqnEpisodeDataRecorder
-from ppocket_rocket.training import GymActionParser, GymObsBuilder, RewardEstimator
+from ppocket_rocket.training import GymActionParser, GymObsBuilder, GeneralReward
 from ppocket_rocket.training import RandomBallGameState
 
 
@@ -44,6 +44,7 @@ def dqn_training(num_instances: int):
     cfg = yaml.safe_load(open(Path('ppocket_rocket') / 'dqn_cfg.yaml', 'r'))
     replay_buffer_cfg = dict(cfg['replay_buffer'])
     min_rp_data_size = int(replay_buffer_cfg['min_buffer_size'])
+    discount_factor = float(cfg['rollout']['discount_factor'])
     
     model_data_provider = ModelDataProvider()
     state_predictor = StatePredictorModel.build_model(cfg['model'], model_data_provider)
@@ -53,7 +54,7 @@ def dqn_training(num_instances: int):
     
     action_parser = GymActionParser(model_data_provider)
     obs_builder = GymObsBuilder(model_data_provider, double_mirror=True)
-    reward_estimator = RewardEstimator()
+    general_reward = GeneralReward(discount_factor=discount_factor)
     replay_buffer = ReplayBuffer()
     trainer = DqnTrainer(cfg, replay_buffer, device)
         
@@ -64,7 +65,7 @@ def dqn_training(num_instances: int):
 
     def get_match():
         return Match(
-            reward_function=reward_estimator,
+            reward_function=general_reward,
             terminal_conditions=[TimeoutCondition(300 * 10), GoalScoredCondition()],
             obs_builder=obs_builder,
             state_setter=RandomBallGameState(),

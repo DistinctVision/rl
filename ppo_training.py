@@ -100,7 +100,7 @@ def ppo_training(num_of_env_instances: int, tag: str):
             obs_builder=ext_obs_builder,
             state_setter=GeneralStateSetter(dict(cfg['replays'])),
             action_parser=action_parser,
-            game_speed=100, tick_skip=8, spawn_opponents=True, team_size=1
+            game_speed=1, tick_skip=8, spawn_opponents=True, team_size=1
         )
 
     env = SB3MultipleInstanceEnv(match_func_or_matches=get_match,
@@ -144,7 +144,7 @@ def ppo_training(num_of_env_instances: int, tag: str):
         
         dones = np.array([False for _ in  range(num_cars * num_of_env_instances)], dtype=bool)
         
-        steps = 0
+        n_steps = 0
         ep_rewards = [0 if cur_rollout_buffer is not None else None for cur_rollout_buffer in cur_rollout_buffers]
         
         while not dones.all():
@@ -189,7 +189,7 @@ def ppo_training(num_of_env_instances: int, tag: str):
                 action_log_prob = float(action_dists[car_idx].log_prob(torch.tensor(actions[car_idx])))
                 cur_rollout_buffer.add(obs[car_idx], actions[car_idx], action_log_prob, rewards[car_idx])
             
-            if steps >= rollout_max_buffer_size:
+            if n_steps >= rollout_max_buffer_size:
                 next_dones_ = []
                 for next_done, state in zip(next_dones, gameinfo):
                     if not next_done:
@@ -211,7 +211,7 @@ def ppo_training(num_of_env_instances: int, tag: str):
             obs = next_obs
             nexto_obs = next_nexto_obs
             dones = np.logical_or(dones, next_dones)
-            steps += 1
+            n_steps += 1
         
         ep_rewards = [reward for reward in ep_rewards if reward is not None]
         for reward in ep_rewards:
@@ -240,11 +240,12 @@ def ppo_training(num_of_env_instances: int, tag: str):
         print(f'Episode: {ep_counter} | Rollout buffer size: {data_size} | Mean rewards: {last_mean_reward:.2f} |'\
             f'Episode Rewards: {ep_rewards_str}')
         
-        while data_size >= target_data_size:
-            dataset, rollout_buffers = RolloutDataset.collect_data(target_data_size, batch_size, sequence_size,
-                                                                   rollout_buffers)
-            trainer.train(dataset)
-            data_size = sum([len(rollout_buffer) for rollout_buffer in rollout_buffers])
+        if data_size >= target_data_size:
+            while data_size >= 0:
+                dataset, rollout_buffers = RolloutDataset.collect_data(target_data_size, batch_size, sequence_size,
+                                                                    rollout_buffers)
+                trainer.train(dataset)
+                data_size = sum([len(rollout_buffer) for rollout_buffer in rollout_buffers])
             
         if ep_counter % int(training_cfg['save']['save_hist_every_n_step']) == 0:
             save_histograms(trainer.log_writer.output_plot_folder, blue_mem_reward_values, 'hist_blue')

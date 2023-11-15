@@ -53,9 +53,9 @@ class ModelDataProvider:
         flags = ball_flags + bot_flags + player_flags + [False]
         return flags
             
-    def __init__(self):
+    def __init__(self, use_scale: bool = True):
         self.action_lookup_table, self.action_states = self._make_action_lookup_table()
-        self.data_scaler = DataScaler()
+        self.data_scaler = DataScaler() if use_scale else None
         
     @property
     def default_action_index(self) -> int:
@@ -68,7 +68,8 @@ class ModelDataProvider:
         assert agent_team_idx in {0, 1}
         assert len(world_state.players) == 2 and len(world_state.players[0]) == 1 and len(world_state.players[1]) == 1
         
-        world_state = self.data_scaler.scale(world_state, copy=copy)
+        if self.data_scaler is not None:
+            world_state = self.data_scaler.scale(world_state, copy=copy)
         
         ball = world_state.ball
         ball_features = [ball.location.x, ball.location.y, ball.location.z,
@@ -152,7 +153,8 @@ class ModelDataProvider:
             
             teams = [[agent_info], [enemy_info]] if team_idx == 0 else [[enemy_info], [agent_info]]
             world_state = WorldState(ball=ball, players=teams, boosts=None)
-            world_state = self.data_scaler.unscale(world_state, copy=True)
+            if self.data_scaler is not None:
+                world_state = self.data_scaler.unscale(world_state, copy=True)
             out.append(world_state)
         return out if is_batch else out[0]
     

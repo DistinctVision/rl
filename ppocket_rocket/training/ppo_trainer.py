@@ -40,14 +40,15 @@ class PpoTrainer:
     def __init__(self,
                  cfg: tp.Dict[str, tp.Any],
                  device: tp.Union[torch.device, str],
-                 tag: str):
+                 tag: str,
+                 overwrite: bool = False):
         self.cfg = cfg
         self.logger = logging.getLogger(__name__)
         self.device = torch.device(device)
 
         training_cfg = self.cfg['training']
         self.run_name = get_run_name(tag)
-        self.run_output_folder = make_output_folder(training_cfg['output_folder'], self.run_name, False)
+        self.run_output_folder = make_output_folder(training_cfg['output_folder'], self.run_name, overwrite)
 
         self.models: tp.Optional[ActorCriticPolicy] = None
         self.optimizer: tp.Optional[torch.optim.Optimizer] = None
