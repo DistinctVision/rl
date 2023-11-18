@@ -73,21 +73,30 @@ class LastTouchReward(RewardFunction):
             return self.value
         return 0
     
-class SaveBoostReward(RewardFunction):
     
-    def __init__(self,  scale: float  = 10.0):
+class TakeBoostReward(RewardFunction):
+    
+    def __init__(self,  scale: float  = 1e1):
         self.scale = scale
     
     def reset(self, initial_state: GameState):
-        pass
+        self.prev_boosts = {
+            player.car_id: player.boost_amount for player in initial_state.players
+        }
+        self.new_boosts = {car_id: 0 for car_id in  self.prev_boosts}
+
+    def pre_step(self, state: GameState):
+        for player in state.players:
+            self.new_boosts[player.car_id] = max(player.boost_amount - self.prev_boosts[player.car_id], 0)
+            self.prev_boosts[player.car_id] = player.boost_amount
 
     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
-        return player.boost_amount *  self.scale
+        return self.new_boosts[player.car_id] *  self.scale
     
     
 class TouchBallReward(RewardFunction):
     
-    def __init__(self, value: float = 100.0):
+    def __init__(self, value: float = 1e1 / BALL_RADIUS):
         self.value = value
         
     def reset(self, initial_state: GameState):
@@ -96,7 +105,7 @@ class TouchBallReward(RewardFunction):
     def get_reward(self, player: PlayerData, state: GameState, previous_action: np.ndarray) -> float:
         if not player.ball_touched:
             return 0.0
-        height_weight = (state.ball.position[2] - BALL_RADIUS) / CEILING_Z
+        height_weight = (state.ball.position[2] - BALL_RADIUS)
         return self.value * height_weight
     
     
@@ -138,7 +147,6 @@ class DemolutionReward(RewardFunction):
             
         return score
             
-    
     
 class GoalReward(RewardFunction):
     
@@ -210,7 +218,7 @@ class GeneralReward(RewardFunction):
         self.rewards: tp.Dict[str, RewardFunction] = {
             'closest_to_ball': ClosestToBallReward(),
             'last_touch': LastTouchReward(),
-            'save_boost': SaveBoostReward(),
+            'take_boost': TakeBoostReward(),
             'touch_ball': TouchBallReward(),
             'goal_reward': GoalReward(discount_factor=discount_factor)
         }

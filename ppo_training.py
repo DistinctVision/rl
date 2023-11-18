@@ -93,18 +93,19 @@ def ppo_training(num_of_env_instances: int, tag: str):
         
     num_cars = 2
 
+    max_num_of_frames = min(90 * 12, rollout_max_buffer_size)
     def get_match():
         return Match(
             reward_function=general_reward,
-            terminal_conditions=[TimeoutCondition(90 * 12), GoalScoredCondition()],
+            terminal_conditions=[TimeoutCondition(max_num_of_frames), GoalScoredCondition()],
             obs_builder=ext_obs_builder,
             state_setter=GeneralStateSetter(dict(cfg['replays'])),
             action_parser=action_parser,
-            game_speed=1, tick_skip=8, spawn_opponents=True, team_size=1
+            game_speed=100, tick_skip=8, spawn_opponents=True, team_size=1
         )
 
     env = SB3MultipleInstanceEnv(match_func_or_matches=get_match,
-                                 num_instances=num_of_env_instances, wait_time=30)
+                                 num_instances=num_of_env_instances, wait_time=40)
 
     last_rewards = deque(maxlen=200)
     ep_counter = 0
@@ -113,20 +114,20 @@ def ppo_training(num_of_env_instances: int, tag: str):
         cur_rollout_buffers: tp.List[tp.Optional[RolloutBuffer]] = []
         
         for _ in range(num_of_env_instances):
-            # has_nexto = np.random.choice([False, False, True])
-            # if has_nexto:
-            #     nexto_team = np.random.choice([0, 1])
-            #     if nexto_team == 0:
-            #         cur_rollout_buffers.append(None)
-            #         cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net,
-            #                                                  sequence_size))
-            #     else:
-            #         cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net,
-            #                                                  sequence_size))
-            #         cur_rollout_buffers.append(None)
-            # else:
-            cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size))
-            cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size))
+            has_nexto = np.random.choice([False, False, True])
+            if has_nexto:
+                nexto_team = np.random.choice([0, 1])
+                if nexto_team == 0:
+                    cur_rollout_buffers.append(None)
+                    cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net,
+                                                             sequence_size))
+                else:
+                    cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net,
+                                                             sequence_size))
+                    cur_rollout_buffers.append(None)
+            else:
+                cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size))
+                cur_rollout_buffers.append(RolloutBuffer(rollout_cfg, actor_critic_policy.value_net, sequence_size))
                 
         nexto_betas: tp.List[tp.Optional[float]] = []
         for cur_rollout_buffer in cur_rollout_buffers:
@@ -134,7 +135,7 @@ def ppo_training(num_of_env_instances: int, tag: str):
                 cur_rollout_buffer.start()
                 nexto_betas.append(None)
             else:
-                nexto_betas.append(random.uniform(0, 1))
+                nexto_betas.append(random.uniform(0, 0.1))
         
         obs = env.reset()
         obs = fix_data(obs)
@@ -189,20 +190,20 @@ def ppo_training(num_of_env_instances: int, tag: str):
                 action_log_prob = float(action_dists[car_idx].log_prob(torch.tensor(actions[car_idx])))
                 cur_rollout_buffer.add(obs[car_idx], actions[car_idx], action_log_prob, rewards[car_idx])
             
-            if n_steps >= rollout_max_buffer_size:
-                next_dones_ = []
-                for next_done, state in zip(next_dones, gameinfo):
-                    if not next_done:
-                        state['TimeLimit.truncated'] = True
-                    next_dones_.append(True)
-                next_dones = np.array(next_dones_, dtype=bool)
-            
-            for car_idx in range(num_of_env_instances * num_cars):
-                cur_rollout_buffer = cur_rollout_buffers[car_idx]
-                if not next_dones[car_idx] or cur_rollout_buffer is None:
-                    continue
-                state = gameinfo[car_idx]
-                cur_rollout_buffer.finish(next_obs[car_idx], truncated=state['TimeLimit.truncated'])
+            if n_steps >= max_num_of_frames:
+                for car_idx in range(num_of_env_instances * num_cars):
+                    cur_rollout_buffer = cur_rollout_buffers[car_idx]
+                    if dones[car_idx] or not next_dones[car_idx] or cur_rollout_buffer is None:
+                        continue
+                    cur_rollout_buffer.finish(next_obs[car_idx], True)
+                dones[:] = True
+            else:
+                for car_idx in range(num_of_env_instances * num_cars):
+                    cur_rollout_buffer = cur_rollout_buffers[car_idx]
+                    if dones[car_idx] or not next_dones[car_idx] or cur_rollout_buffer is None:
+                        continue
+                    cur_rollout_buffer.finish(next_obs[car_idx], False)
+                dones = np.logical_or(dones, next_dones)
             
             for idx, reward in enumerate(rewards):
                 if reward is None:
@@ -241,9 +242,9 @@ def ppo_training(num_of_env_instances: int, tag: str):
             f'Episode Rewards: {ep_rewards_str}')
         
         if data_size >= target_data_size:
-            while data_size >= 0:
+            while data_size > 0:
                 dataset, rollout_buffers = RolloutDataset.collect_data(target_data_size, batch_size, sequence_size,
-                                                                    rollout_buffers)
+                                                                       rollout_buffers)
                 trainer.train(dataset)
                 data_size = sum([len(rollout_buffer) for rollout_buffer in rollout_buffers])
             
