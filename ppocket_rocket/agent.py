@@ -17,10 +17,12 @@ from rlbot.utils.structures.game_data_struct import GameTickPacket
 from ppocket_rocket.utils import Vec3, EulerAngles
 from ppocket_rocket.game_data import WorldState, ModelDataProvider
 from ppocket_rocket.actor_critic_policy import ActorCriticPolicy
+from ppocket_rocket.training import GymObsBuilder
 
 from rlgym_compat import GameState
 from rlgym.utils.gamestates import PlayerData, PhysicsObject
 from ppocket_rocket.game_data import BallInfo, EulerAngles, Vec3, PlayerInfo
+from rlgym.utils.common_values import ORANGE_TEAM
 
 
 
@@ -50,8 +52,9 @@ class PPocketRoecket(BaseAgent):
         self.last_time_tick: tp.Optional[float] = None
         self.last_controls = SimpleControllerState()
         
+        self.obs_builder = GymObsBuilder(self.data_provider, orange_mirror=True)
+        
     def initialize_agent(self):
-        ...
         self.field_info = self.get_field_info()
         self.game_state = GameState(self.field_info)
     
@@ -106,12 +109,15 @@ class PPocketRoecket(BaseAgent):
                 return self.last_controls
             
         self.game_state.decode(packet)
-        agent: PlayerData = self.game_state.players[self.team]
-        player: PlayerData = self.game_state.players[1 - self.team]
-        # world_state_1 = self._build_world_state(agent, agent.car_data, player, player.car_data, self.game_state.ball, self.game_state.boost_pads)
+        # agent: PlayerData = self.game_state.players[self.team]
+        # player: PlayerData = self.game_state.players[1 - self.team]
+        # # world_state_1 = self._build_world_state(agent, agent.car_data, player, player.car_data, self.game_state.ball, self.game_state.boost_pads)
         
-        world_state = WorldState.from_game_packet(packet)
-        world_states_tensor = self.data_provider.world_state_to_tensor(world_state, self.team, self.device)
+        # world_state = WorldState.from_game_packet(packet)
+        # world_states_tensor = self.data_provider.world_state_to_tensor(world_state, self.team, self.device)
+        
+        world_states_tensor = self.obs_builder.build_obs(self.game_state.players[self.team], self.game_state, None)
+        world_states_tensor = world_states_tensor.to(self.device)
         
         with torch.no_grad():
             logits: torch.Tensor = self.policy_net(world_states_tensor.unsqueeze(0))

@@ -7,8 +7,8 @@ model:
   _value_net_layers: [256, 256]
   dropout: 0.0
 
-  models_path: '..\rl_output\ppo_new_without_nexto_11_12_2023__23_18_39\weights\ppocket_rocket_1765.kpt'
-  optimizer_path: '..\rl_output\ppo_new_without_nexto_11_12_2023__23_18_39\weights\opt_ppocket_rocket_1765.kpt'
+  models_path: 'ppocket_rocket\model.kpt'
+  _optimizer_path: '..\rl_output\ppo_3\weights\opt_ppocket_rocket_3235.kpt'
   
 game:
   fps: 12
